@@ -34,7 +34,7 @@ const AuthPage = () => {
 
   const completeSignIn = () => {
     toast.success('Signed in');
-    navigate('/');
+    navigate('/dashboard');
   };
 
   const handleLogin = async (e: React.FormEvent) => {

@@ -63,7 +63,7 @@ const OnboardingOrg = () => {
           if (payload.new?.status === 'approved') {
             toast.success('Your membership was approved!');
             await refresh();
-            navigate('/');
+            navigate('/dashboard');
           } else {
             fetchRequests();
           }
