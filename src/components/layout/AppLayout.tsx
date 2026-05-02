@@ -57,20 +57,20 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const financeItems = [
-    { to: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
-    { to: '/tasks', icon: ListChecks, label: t('nav.tasks') },
-    { to: '/expenses', icon: Receipt, label: t('nav.expenses') },
-    { to: '/budgets', icon: PiggyBank, label: t('nav.budgets') },
-    { to: '/savings', icon: Target, label: t('nav.savings') },
+    { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { to: '/dashboard/tasks', icon: ListChecks, label: t('nav.tasks') },
+    { to: '/dashboard/expenses', icon: Receipt, label: t('nav.expenses') },
+    { to: '/dashboard/budgets', icon: PiggyBank, label: t('nav.budgets') },
+    { to: '/dashboard/savings', icon: Target, label: t('nav.savings') },
   ];
 
   const portfolioItems = [
-    { to: '/portfolio', icon: Briefcase, label: t('nav.portfolio') },
-    { to: '/market', icon: TrendingUp, label: t('nav.market') },
-    { to: '/analytics', icon: BarChart3, label: t('nav.analytics') },
-    { to: '/ai-insights', icon: Sparkles, label: t('nav.aiInsights') },
-    { to: '/notifications', icon: Bell, label: t('nav.notifications') },
-    { to: '/settings', icon: Settings, label: t('nav.settings') },
+    { to: '/dashboard/portfolio', icon: Briefcase, label: t('nav.portfolio') },
+    { to: '/dashboard/market', icon: TrendingUp, label: t('nav.market') },
+    { to: '/dashboard/analytics', icon: BarChart3, label: t('nav.analytics') },
+    { to: '/dashboard/ai-insights', icon: Sparkles, label: t('nav.aiInsights') },
+    { to: '/dashboard/notifications', icon: Bell, label: t('nav.notifications') },
+    { to: '/dashboard/settings', icon: Settings, label: t('nav.settings') },
   ];
 
   const renderNavItem = ({ to, icon: Icon, label }: { to: string; icon: typeof LayoutDashboard; label: string }) => {
