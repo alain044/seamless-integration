@@ -9,6 +9,14 @@ import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import AppLayout from "@/components/layout/AppLayout";
+import { AskSavvyButton } from "@/components/AskSavvyButton";
+
+import Landing from "./pages/Landing";
+import Features from "./pages/Features";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Chat from "./pages/Chat";
+
 import Index from "./pages/Index";
 import OnboardingOrg from "./pages/OnboardingOrg";
 import TasksPage from "./pages/TasksPage";
@@ -28,7 +36,7 @@ import "./i18n";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoutes = () => {
+const ProtectedDashboard = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -69,19 +77,18 @@ const OrgGate = () => {
     <AppLayout>
       <Routes>
         <Route path="/" element={<Index />} />
-        <Route path="/expenses" element={<Expenses />} />
-        <Route path="/budgets" element={<Budgets />} />
-        <Route path="/savings" element={<Savings />} />
-        <Route path="/tasks" element={<TasksPage />} />
-        <Route path="/portfolio" element={<PortfolioPage />} />
-        <Route path="/market" element={<MarketDataPage />} />
-        <Route path="/ai-insights" element={<AIInsights />} />
-        {/* Legacy redirects */}
-        <Route path="/finance-advisor" element={<Navigate to="/ai-insights" replace />} />
-        <Route path="/portfolio-advisor" element={<Navigate to="/ai-insights" replace />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="expenses" element={<Expenses />} />
+        <Route path="budgets" element={<Budgets />} />
+        <Route path="savings" element={<Savings />} />
+        <Route path="tasks" element={<TasksPage />} />
+        <Route path="portfolio" element={<PortfolioPage />} />
+        <Route path="market" element={<MarketDataPage />} />
+        <Route path="ai-insights" element={<AIInsights />} />
+        <Route path="finance-advisor" element={<Navigate to="/dashboard/ai-insights" replace />} />
+        <Route path="portfolio-advisor" element={<Navigate to="/dashboard/ai-insights" replace />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
@@ -91,7 +98,7 @@ const OrgGate = () => {
 const AuthRoute = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <AuthPage />;
 };
 
@@ -104,10 +111,19 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/chat" element={<Chat />} />
               <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/login" element={<Navigate to="/auth" replace />} />
+              <Route path="/signup" element={<Navigate to="/auth" replace />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
+              <Route path="/dashboard/*" element={<ProtectedDashboard />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
+            <AskSavvyButton />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
