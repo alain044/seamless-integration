@@ -5,8 +5,8 @@ import { motion } from "framer-motion";
 export function AskSavvyButton() {
   const location = useLocation();
 
-  // Hide on the chat page itself
-  if (location.pathname === "/chat") return null;
+  // Hide on the chat page and in the dashboard (where AI Insights lives)
+  if (location.pathname === "/chat" || location.pathname.startsWith("/dashboard")) return null;
 
   return (
     <motion.div
