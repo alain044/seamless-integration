@@ -1,0 +1,13 @@
+project_id = "ydyrvlsvzukwxyjlieme"
+
+[functions.market-quotes]
+verify_jwt = false
+
+[functions.ai-insights]
+verify_jwt = false
+
+[functions.exchange-rates]
+verify_jwt = false
+
+[functions.check-price-alerts]
+verify_jwt = false
