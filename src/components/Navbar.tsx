@@ -54,6 +54,11 @@ export function Navbar() {
           <ThemeToggle />
           {user ? (
             <>
+              <Link to="/dashboard">
+                <Button size="sm" className="gradient-primary text-primary-foreground border-0 shadow-glow">
+                  Dashboard
+                </Button>
+              </Link>
               <span className="text-sm font-medium text-foreground">Hi, {firstName}</span>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-1" /> Sign Out
