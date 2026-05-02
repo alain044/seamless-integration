@@ -12,11 +12,18 @@ export interface Organization {
   created_by: string;
 }
 
+export interface Membership {
+  organization: Organization;
+  role: AppRole;
+}
+
 interface OrgContextValue {
   organization: Organization | null;
   role: AppRole | null;
+  memberships: Membership[];
   loading: boolean;
   refresh: () => Promise<void>;
+  switchOrganization: (orgId: string) => Promise<void>;
   canManageTasks: boolean;
   canEditFinance: boolean;
   isOwner: boolean;
@@ -27,8 +34,10 @@ interface OrgContextValue {
 const OrganizationContext = createContext<OrgContextValue>({
   organization: null,
   role: null,
+  memberships: [],
   loading: true,
   refresh: async () => {},
+  switchOrganization: async () => {},
   canManageTasks: false,
   canEditFinance: false,
   isOwner: false,
@@ -40,37 +49,54 @@ export const useOrganization = () => useContext(OrganizationContext);
 
 export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!user) {
-      setOrganization(null);
-      setRole(null);
+      setMemberships([]);
+      setActiveId(null);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { data: membership } = await supabase
-      .from('organization_members')
-      .select('role, organization_id, organizations(*)')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const [{ data: rows }, { data: settings }] = await Promise.all([
+      supabase
+        .from('organization_members')
+        .select('role, organizations(*)')
+        .eq('user_id', user.id),
+      supabase
+        .from('user_settings')
+        .select('active_organization_id')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ]);
 
-    if (membership?.organizations) {
-      setOrganization(membership.organizations as Organization);
-      setRole(membership.role as AppRole);
-    } else {
-      setOrganization(null);
-      setRole(null);
-    }
+    const list: Membership[] = (rows ?? [])
+      .filter((r: any) => r.organizations)
+      .map((r: any) => ({ organization: r.organizations, role: r.role }));
+    setMemberships(list);
+
+    const stored = (settings as any)?.active_organization_id ?? null;
+    const valid = list.find((m) => m.organization.id === stored);
+    setActiveId(valid ? stored : list[0]?.organization.id ?? null);
     setLoading(false);
   }, [user]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const switchOrganization = useCallback(async (orgId: string) => {
+    if (!user) return;
+    setActiveId(orgId);
+    await supabase
+      .from('user_settings')
+      .upsert({ user_id: user.id, active_organization_id: orgId } as any, { onConflict: 'user_id' });
+  }, [user]);
+
+  const active = memberships.find((m) => m.organization.id === activeId) ?? null;
+  const organization = active?.organization ?? null;
+  const role = active?.role ?? null;
 
   const canManageTasks = role === 'owner' || role === 'accountant';
   const canEditFinance = role === 'owner' || role === 'accountant' || role === 'analyst';
@@ -80,7 +106,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <OrganizationContext.Provider
-      value={{ organization, role, loading, refresh, canManageTasks, canEditFinance, isOwner, isViewer, canEdit }}
+      value={{ organization, role, memberships, loading, refresh, switchOrganization, canManageTasks, canEditFinance, isOwner, isViewer, canEdit }}
     >
       {children}
     </OrganizationContext.Provider>
