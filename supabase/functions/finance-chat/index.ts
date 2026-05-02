@@ -21,8 +21,15 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const systemMessages = [{ role: "system", content: SYSTEM_PROMPT }];
+    if (context) {
+      systemMessages.push({
+        role: "system",
+        content: `User dashboard context (use to personalize answers):\n${typeof context === 'string' ? context : JSON.stringify(context)}`,
+      });
+    }
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const response = await fetch(
@@ -35,10 +42,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages,
-          ],
+          messages: [...systemMessages, ...messages],
           stream: true,
         }),
       }
