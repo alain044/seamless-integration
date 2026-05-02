@@ -50,7 +50,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Link to="/signup">
+            <Link to="/auth">
               <Button size="lg" className="gradient-primary text-primary-foreground border-0 shadow-glow px-8">
                 Get Started Free
                 <ArrowRight className="ml-2 h-4 w-4" />

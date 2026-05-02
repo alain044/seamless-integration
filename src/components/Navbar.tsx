@@ -61,10 +61,10 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <Link to="/login">
+              <Link to="/auth">
                 <Button variant="ghost" size="sm">Log In</Button>
               </Link>
-              <Link to="/signup">
+              <Link to="/auth">
                 <Button size="sm" className="gradient-primary text-primary-foreground border-0 shadow-glow">
                   Sign Up
                 </Button>
@@ -111,10 +111,10 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2 border-t border-border mt-2">
-                  <Link to="/login" className="flex-1" onClick={() => setMobileOpen(false)}>
+                  <Link to="/auth" className="flex-1" onClick={() => setMobileOpen(false)}>
                     <Button variant="outline" className="w-full">Log In</Button>
                   </Link>
-                  <Link to="/signup" className="flex-1" onClick={() => setMobileOpen(false)}>
+                  <Link to="/auth" className="flex-1" onClick={() => setMobileOpen(false)}>
                     <Button className="w-full gradient-primary text-primary-foreground border-0">Sign Up</Button>
                   </Link>
                 </div>
