@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Receipt, PiggyBank, Target, Sparkles,
   Briefcase, TrendingUp, BarChart3, Bell, ListChecks,
-  Settings, ChevronLeft, ChevronRight, LogOut, Building2
+  Settings, ChevronLeft, ChevronRight, LogOut, Building2, Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -12,6 +12,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
+import { OrgSwitcher } from '@/components/OrgSwitcher';
 
 const SignOutButton = ({ collapsed }: { collapsed: boolean }) => {
   const { t } = useTranslation();
@@ -70,6 +71,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     { to: '/dashboard/analytics', icon: BarChart3, label: t('nav.analytics') },
     { to: '/dashboard/ai-insights', icon: Sparkles, label: t('nav.aiInsights') },
     { to: '/dashboard/notifications', icon: Bell, label: t('nav.notifications') },
+    { to: '/dashboard/status', icon: Activity, label: 'System Status' },
     { to: '/dashboard/settings', icon: Settings, label: t('nav.settings') },
   ];
 
@@ -172,7 +174,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto flex flex-col">
+        <header className="flex items-center justify-end gap-2 px-6 py-3 border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
+          <OrgSwitcher />
+        </header>
+        <div className="flex-1">{children}</div>
+      </main>
     </div>
   );
 };
