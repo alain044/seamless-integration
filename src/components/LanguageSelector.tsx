@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const languages = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -16,9 +18,28 @@ const languages = [
 
 const LanguageSelector = ({ collapsed = false }: { collapsed?: boolean }) => {
   const { i18n } = useTranslation();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
   const currentLang = languages.find((l) => l.code === i18n.language) || languages[0];
+
+  const handleSelect = async (code: string) => {
+    await i18n.changeLanguage(code);
+    setOpen(false);
+    if (user) {
+      // Persist language to DB so it follows the user across logins/devices.
+      const { data } = await supabase
+        .from('user_settings')
+        .select('preferences, notifications')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const prefs = { ...((data?.preferences as any) ?? {}), language: code };
+      await supabase.from('user_settings').upsert(
+        { user_id: user.id, preferences: prefs, notifications: (data?.notifications as any) ?? {} },
+        { onConflict: 'user_id' },
+      );
+    }
+  };
 
   return (
     <div className="relative">
@@ -50,10 +71,7 @@ const LanguageSelector = ({ collapsed = false }: { collapsed?: boolean }) => {
             {languages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => {
-                  i18n.changeLanguage(lang.code);
-                  setOpen(false);
-                }}
+                onClick={() => handleSelect(lang.code)}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors',
                   'hover:bg-accent',

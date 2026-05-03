@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, UserCog, Trash2, Crown } from 'lucide-react';
+import { Loader2, UserCog, Trash2, Crown, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization, AppRole } from '@/contexts/OrganizationContext';
@@ -33,6 +34,11 @@ const roleColor: Record<AppRole, string> = {
   accountant: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   analyst: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
   viewer: 'bg-muted text-muted-foreground border-border',
+};
+
+const initials = (name: string, email?: string | null) => {
+  const src = name?.trim() || email?.split('@')[0] || '?';
+  return src.split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || '?';
 };
 
 export const UserManagementPanel = () => {
@@ -128,18 +134,31 @@ export const UserManagementPanel = () => {
           <div className="space-y-2">
             {members.map((m) => {
               const p = profiles[m.user_id];
-              const name = p?.full_name || p?.email || 'Member';
+              const name = p?.full_name?.trim() || (p?.email ? p.email.split('@')[0] : 'Unknown user');
               const isSelf = m.user_id === user?.id;
               return (
                 <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">{name}</p>
-                      {isSelf && <Badge variant="outline" className="text-xs">You</Badge>}
-                      {m.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-500" />}
-                      <Badge variant="outline" className={roleColor[m.role]}>{m.role}</Badge>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Avatar className="h-9 w-9 shrink-0">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        {initials(name, p?.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-foreground truncate">{name}</p>
+                        {isSelf && <Badge variant="outline" className="text-xs">You</Badge>}
+                        {m.role === 'owner' && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                        <Badge variant="outline" className={roleColor[m.role]}>{m.role}</Badge>
+                      </div>
+                      {p?.email ? (
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> {p.email}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">no email on profile</p>
+                      )}
                     </div>
-                    {p?.email && <p className="text-xs text-muted-foreground truncate">{p.email}</p>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Select
