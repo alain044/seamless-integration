@@ -284,23 +284,25 @@ const TasksPage = () => {
             const isMine = task.assigned_to === user?.id;
             const canEdit = isMine || canManageTasks;
             return (
-              <Card key={task.id} className={cn('transition-shadow hover:shadow-md', task.status === 'completed' && 'opacity-70')}>
+              <Card key={task.id} className={cn('transition-shadow hover:shadow-md', task.status === 'approved' && 'opacity-70')}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <button
-                        onClick={() => canEdit && updateStatus(task, task.status === 'completed' ? 'pending' : 'completed')}
-                        disabled={!canEdit}
+                        onClick={() => canEdit && task.status !== 'approved' && updateStatus(task, task.status === 'completed' ? 'pending' : 'completed')}
+                        disabled={!canEdit || task.status === 'approved'}
                         className="mt-0.5 disabled:cursor-not-allowed"
                       >
-                        {task.status === 'completed'
-                          ? <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        {task.status === 'approved'
+                          ? <ShieldCheck className="w-5 h-5 text-green-600" />
+                          : task.status === 'completed'
+                          ? <CheckCircle2 className="w-5 h-5 text-amber-500" />
                           : task.status === 'in_progress'
                           ? <Clock className="w-5 h-5 text-primary" />
                           : <Circle className="w-5 h-5 text-muted-foreground" />}
                       </button>
                       <div className="min-w-0">
-                        <CardTitle className={cn('text-base', task.status === 'completed' && 'line-through')}>
+                        <CardTitle className={cn('text-base', task.status === 'approved' && 'line-through')}>
                           {task.title}
                         </CardTitle>
                         {task.description && (
@@ -317,31 +319,47 @@ const TasksPage = () => {
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <Badge variant="secondary" className={statusColor[task.status]}>{t(`tasks.status.${task.status}`)}</Badge>
+                    <Badge variant="secondary" className={statusColor[task.status]}>
+                      {task.status === 'completed' ? 'Completed · awaiting approval' : t(`tasks.status.${task.status}`, { defaultValue: task.status })}
+                    </Badge>
                     <Badge variant="secondary" className={priorityColor[task.priority]}>{t(`tasks.priorities.${task.priority}`)}</Badge>
                     <Badge variant="outline">{t(`tasks.categories.${task.category}`, { defaultValue: task.category })}</Badge>
                     {task.amount > 0 && (
-                      <span className="text-muted-foreground">
-                        {task.currency} {Number(task.amount).toLocaleString()}
-                      </span>
+                      <span className="text-muted-foreground">{task.currency} {Number(task.amount).toLocaleString()}</span>
                     )}
                     {task.due_date && (
                       <span className="text-muted-foreground">📅 {new Date(task.due_date).toLocaleDateString()}</span>
                     )}
+                    {task.status === 'approved' && task.approved_at && (
+                      <span className="text-green-600 dark:text-green-400">✓ approved {new Date(task.approved_at).toLocaleDateString()}</span>
+                    )}
                     <span className="text-muted-foreground ml-auto">→ {memberLabel(task.assigned_to)}</span>
                   </div>
-                  {canEdit && task.status !== 'completed' && (
-                    <div className="flex gap-2 mt-3">
-                      {task.status === 'pending' && (
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(task, 'in_progress')}>
-                          {t('tasks.actions.start')}
-                        </Button>
-                      )}
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {canEdit && task.status === 'pending' && (
+                      <Button size="sm" variant="outline" onClick={() => updateStatus(task, 'in_progress')}>
+                        {t('tasks.actions.start')}
+                      </Button>
+                    )}
+                    {canEdit && task.status !== 'completed' && task.status !== 'approved' && (
                       <Button size="sm" variant="outline" onClick={() => updateStatus(task, 'completed')}>
                         {t('tasks.actions.complete')}
                       </Button>
-                    </div>
-                  )}
+                    )}
+                    {task.status === 'completed' && isOwner && (
+                      <Button size="sm" className="gradient-primary text-primary-foreground border-0" onClick={() => approveTask(task)}>
+                        <ShieldCheck className="w-4 h-4 mr-1" /> Approve
+                      </Button>
+                    )}
+                    {task.status === 'completed' && !isOwner && (
+                      <span className="text-xs text-muted-foreground italic self-center">Awaiting owner approval</span>
+                    )}
+                    {task.status === 'approved' && isOwner && (
+                      <Button size="sm" variant="ghost" onClick={() => updateStatus(task, 'completed')}>
+                        Revoke approval
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
