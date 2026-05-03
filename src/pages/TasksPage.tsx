@@ -141,19 +141,27 @@ const TasksPage = () => {
   };
 
   const updateStatus = async (task: Task, newStatus: string) => {
+    const patch: any = {
+      status: newStatus,
+      completed_at: newStatus === 'completed' ? new Date().toISOString() : task.completed_at,
+    };
+    if (newStatus === 'pending' || newStatus === 'in_progress') {
+      patch.approved_by = null;
+      patch.approved_at = null;
+    }
+    const { error } = await supabase.from('tasks').update(patch).eq('id', task.id);
+    if (error) toast.error(error.message);
+    else { toast.success(t('tasks.updated')); loadData(); }
+  };
+
+  const approveTask = async (task: Task) => {
+    if (!user) return;
     const { error } = await supabase
       .from('tasks')
-      .update({
-        status: newStatus,
-        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-      })
+      .update({ status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() } as any)
       .eq('id', task.id);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success(t('tasks.updated'));
-      loadData();
-    }
+    if (error) toast.error(error.message);
+    else { toast.success('Task approved'); loadData(); }
   };
 
   const deleteTask = async (id: string) => {
