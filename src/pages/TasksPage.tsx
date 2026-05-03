@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/sonner';
-import { Plus, CheckCircle2, Circle, Clock, Trash2, Loader2 } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Task {
@@ -29,6 +29,8 @@ interface Task {
   assigned_to: string;
   created_by: string;
   completed_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
   created_at: string;
 }
 
@@ -42,7 +44,8 @@ interface Member {
 const statusColor: Record<string, string> = {
   pending: 'bg-muted text-muted-foreground',
   in_progress: 'bg-primary/10 text-primary',
-  completed: 'bg-green-500/10 text-green-600 dark:text-green-400',
+  completed: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  approved: 'bg-green-500/10 text-green-600 dark:text-green-400',
   cancelled: 'bg-destructive/10 text-destructive',
 };
 
@@ -55,7 +58,7 @@ const priorityColor: Record<string, string> = {
 const TasksPage = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { organization, role, canManageTasks, loading: orgLoading } = useOrganization();
+  const { organization, role, canManageTasks, isOwner, loading: orgLoading } = useOrganization();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
