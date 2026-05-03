@@ -82,7 +82,7 @@ const TasksPage = () => {
       supabase.from('tasks').select('*').eq('organization_id', organization.id).order('created_at', { ascending: false }),
       supabase.from('organization_members').select('user_id, role').eq('organization_id', organization.id),
     ]);
-    setTasks((taskData as Task[]) ?? []);
+    setTasks(((taskData ?? []) as unknown) as Task[]);
 
     const memberList = (memberData ?? []) as Member[];
     if (memberList.length) {
