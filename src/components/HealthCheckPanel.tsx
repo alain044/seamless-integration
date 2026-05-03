@@ -42,10 +42,18 @@ export const HealthCheckPanel = () => {
         body: c.body ? JSON.stringify(c.body) : undefined,
       });
       const latency = Math.round(performance.now() - start);
-      // Cancel streaming bodies after first chunk to free resource.
+      let errMsg: string | undefined;
+      if (!resp.ok) {
+        try {
+          const j = await resp.clone().json();
+          errMsg = j?.error || `HTTP ${resp.status}`;
+        } catch {
+          errMsg = `HTTP ${resp.status}`;
+        }
+      }
       try { await resp.body?.cancel(); } catch { /* noop */ }
-      if (!resp.ok && resp.status !== 200) {
-        setResults((r) => ({ ...r, [c.fn]: { status: 'error', latency, error: `HTTP ${resp.status}` } }));
+      if (errMsg) {
+        setResults((r) => ({ ...r, [c.fn]: { status: 'error', latency, error: errMsg } }));
       } else {
         setResults((r) => ({ ...r, [c.fn]: { status: 'ok', latency } }));
       }
