@@ -86,6 +86,9 @@ const ResetPassword = () => {
             <Sparkles className="w-5 h-5 text-primary" />
             <span className="text-sm font-semibold tracking-tight text-foreground">Savvy</span>
           </div>
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+            <a href="/">← Back to homepage</a>
+          </Button>
         </div>
 
         <Card className="border-border/60 shadow-xl shadow-primary/5">
