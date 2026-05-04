@@ -64,6 +64,33 @@ export type Database = {
           },
         ]
       }
+      login_otps: {
+        Row: {
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       membership_requests: {
         Row: {
           created_at: string
@@ -346,6 +373,8 @@ export type Database = {
       tasks: {
         Row: {
           amount: number | null
+          approved_at: string | null
+          approved_by: string | null
           assigned_to: string
           category: string
           completed_at: string | null
@@ -363,6 +392,8 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to: string
           category?: string
           completed_at?: string | null
@@ -380,6 +411,8 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to?: string
           category?: string
           completed_at?: string | null
@@ -407,6 +440,7 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          active_organization_id: string | null
           created_at: string
           id: string
           notifications: Json | null
@@ -415,6 +449,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_organization_id?: string | null
           created_at?: string
           id?: string
           notifications?: Json | null
@@ -423,6 +458,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          active_organization_id?: string | null
           created_at?: string
           id?: string
           notifications?: Json | null
@@ -430,7 +466,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       watchlist: {
         Row: {
