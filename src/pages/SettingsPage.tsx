@@ -146,6 +146,42 @@ const SettingsPage = () => {
     return watchNotificationPermission(setPushPermission);
   }, []);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setUploadingAvatar(true);
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
+    if (upErr) { setUploadingAvatar(false); toast.error(upErr.message); return; }
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+    const url = pub.publicUrl;
+    const { error: dbErr } = await supabase.from('profiles').upsert({
+      user_id: user.id, avatar_url: url,
+    }, { onConflict: 'user_id' });
+    setUploadingAvatar(false);
+    if (dbErr) { toast.error(dbErr.message); return; }
+    setProfile((p) => ({ ...p, avatarUrl: url }));
+    setInitialProfile((p) => ({ ...p, avatarUrl: url }));
+    toast.success('Profile photo updated');
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+    setUploadingAvatar(true);
+    const { error } = await supabase.from('profiles').upsert({
+      user_id: user.id, avatar_url: null,
+    }, { onConflict: 'user_id' });
+    setUploadingAvatar(false);
+    if (error) { toast.error(error.message); return; }
+    setProfile((p) => ({ ...p, avatarUrl: '' }));
+    setInitialProfile((p) => ({ ...p, avatarUrl: '' }));
+    toast.success('Profile photo removed');
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
