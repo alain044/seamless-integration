@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgSwitcher } from '@/components/OrgSwitcher';
+import { UserAvatarMenu } from '@/components/UserAvatarMenu';
 
 const SignOutButton = ({ collapsed }: { collapsed: boolean }) => {
   const { t } = useTranslation();
@@ -177,8 +178,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto flex flex-col">
-        <header className="flex items-center justify-end gap-2 px-6 py-3 border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
+        <header className="flex items-center justify-end gap-3 px-6 py-3 border-b border-border bg-background/80 backdrop-blur sticky top-0 z-30">
           <OrgSwitcher />
+          <UserAvatarMenu />
         </header>
         <div className="flex-1">{children}</div>
       </main>
