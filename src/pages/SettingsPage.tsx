@@ -156,6 +156,7 @@ const SettingsPage = () => {
       phone: profile.phone,
       bio: profile.bio,
       currency: profile.currency,
+      avatar_url: profile.avatarUrl || null,
     }, { onConflict: 'user_id' });
     setSaving(false);
     if (error) { console.error(error); toast.error(t('settings.saveFailed')); return; }
