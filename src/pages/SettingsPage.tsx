@@ -342,6 +342,39 @@ const SettingsPage = () => {
               <CardDescription>{t('settings.profileDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-4 pb-2">
+                <Avatar className="w-20 h-20 border-2 border-border">
+                  <AvatarImage src={profile.avatarUrl || undefined} alt={profile.fullName || 'Avatar'} />
+                  <AvatarFallback className="text-lg">
+                    {(profile.fullName || profile.email || '?').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="avatar-upload" className="text-sm">Profile photo</Label>
+                  <div className="flex gap-2">
+                    <Button asChild variant="outline" size="sm" disabled={uploadingAvatar || isViewer}>
+                      <label htmlFor="avatar-upload" className="cursor-pointer">
+                        {uploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        <span className="ml-2">Upload</span>
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                          disabled={uploadingAvatar || isViewer}
+                        />
+                      </label>
+                    </Button>
+                    {profile.avatarUrl && (
+                      <Button variant="ghost" size="sm" onClick={handleAvatarRemove} disabled={uploadingAvatar || isViewer}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">{t('settings.fullName')}</Label>
