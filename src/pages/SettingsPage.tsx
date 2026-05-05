@@ -61,7 +61,9 @@ const SettingsPage = () => {
     phone: '',
     bio: '',
     currency: 'USD',
+    avatarUrl: '',
   });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [initialProfile, setInitialProfile] = useState(profile);
 
   const [notifications, setNotifications] = useState({
