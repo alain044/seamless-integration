@@ -25,6 +25,7 @@ import Chat from "./pages/Chat";
 import Index from "./pages/Index";
 import OnboardingOrg from "./pages/OnboardingOrg";
 import TasksPage from "./pages/TasksPage";
+import ReportsPage from "./pages/ReportsPage";
 import Expenses from "./pages/Expenses";
 import Budgets from "./pages/Budgets";
 import Savings from "./pages/Savings";
@@ -127,6 +128,7 @@ const OrgGate = () => {
         <Route path="budgets" element={<Budgets />} />
         <Route path="savings" element={<Savings />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="portfolio" element={<PortfolioPage />} />
         <Route path="market" element={<MarketDataPage />} />
         <Route path="ai-insights" element={<AIInsights />} />

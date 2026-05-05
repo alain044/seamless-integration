@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Receipt, PiggyBank, Target, Sparkles,
   Briefcase, TrendingUp, BarChart3, Bell, ListChecks,
-  Settings, ChevronLeft, ChevronRight, LogOut, Building2, Activity
+  Settings, ChevronLeft, ChevronRight, LogOut, Building2, Activity, FileSpreadsheet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -57,12 +57,14 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  const canSeeReports = role === 'owner' || role === 'accountant';
   const financeItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: '/dashboard/tasks', icon: ListChecks, label: t('nav.tasks') },
     { to: '/dashboard/expenses', icon: Receipt, label: t('nav.expenses') },
     { to: '/dashboard/budgets', icon: PiggyBank, label: t('nav.budgets') },
     { to: '/dashboard/savings', icon: Target, label: t('nav.savings') },
+    ...(canSeeReports ? [{ to: '/dashboard/reports', icon: FileSpreadsheet, label: 'Reports' }] : []),
   ];
 
   const portfolioItems = [
