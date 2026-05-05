@@ -110,6 +110,7 @@ const SettingsPage = () => {
           phone: profileRes.data.phone || '',
           bio: profileRes.data.bio || '',
           currency: profileRes.data.currency || 'USD',
+          avatarUrl: (profileRes.data as any).avatar_url || '',
         };
         setProfile(next);
         setInitialProfile(next);
