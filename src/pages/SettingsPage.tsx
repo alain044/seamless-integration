@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Bell, Palette, Shield, Save, Loader2, BellRing, Eye, EyeOff } from 'lucide-react';
+import { User, Bell, Palette, Shield, Save, Loader2, BellRing, Eye, EyeOff, Upload, Trash2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,7 +61,9 @@ const SettingsPage = () => {
     phone: '',
     bio: '',
     currency: 'USD',
+    avatarUrl: '',
   });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [initialProfile, setInitialProfile] = useState(profile);
 
   const [notifications, setNotifications] = useState({
@@ -107,6 +110,7 @@ const SettingsPage = () => {
           phone: profileRes.data.phone || '',
           bio: profileRes.data.bio || '',
           currency: profileRes.data.currency || 'USD',
+          avatarUrl: (profileRes.data as any).avatar_url || '',
         };
         setProfile(next);
         setInitialProfile(next);
@@ -142,6 +146,42 @@ const SettingsPage = () => {
     return watchNotificationPermission(setPushPermission);
   }, []);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setUploadingAvatar(true);
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
+    if (upErr) { setUploadingAvatar(false); toast.error(upErr.message); return; }
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+    const url = pub.publicUrl;
+    const { error: dbErr } = await supabase.from('profiles').upsert({
+      user_id: user.id, avatar_url: url,
+    }, { onConflict: 'user_id' });
+    setUploadingAvatar(false);
+    if (dbErr) { toast.error(dbErr.message); return; }
+    setProfile((p) => ({ ...p, avatarUrl: url }));
+    setInitialProfile((p) => ({ ...p, avatarUrl: url }));
+    toast.success('Profile photo updated');
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+    setUploadingAvatar(true);
+    const { error } = await supabase.from('profiles').upsert({
+      user_id: user.id, avatar_url: null,
+    }, { onConflict: 'user_id' });
+    setUploadingAvatar(false);
+    if (error) { toast.error(error.message); return; }
+    setProfile((p) => ({ ...p, avatarUrl: '' }));
+    setInitialProfile((p) => ({ ...p, avatarUrl: '' }));
+    toast.success('Profile photo removed');
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
@@ -152,6 +192,7 @@ const SettingsPage = () => {
       phone: profile.phone,
       bio: profile.bio,
       currency: profile.currency,
+      avatar_url: profile.avatarUrl || null,
     }, { onConflict: 'user_id' });
     setSaving(false);
     if (error) { console.error(error); toast.error(t('settings.saveFailed')); return; }
@@ -301,6 +342,39 @@ const SettingsPage = () => {
               <CardDescription>{t('settings.profileDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-4 pb-2">
+                <Avatar className="w-20 h-20 border-2 border-border">
+                  <AvatarImage src={profile.avatarUrl || undefined} alt={profile.fullName || 'Avatar'} />
+                  <AvatarFallback className="text-lg">
+                    {(profile.fullName || profile.email || '?').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="avatar-upload" className="text-sm">Profile photo</Label>
+                  <div className="flex gap-2">
+                    <Button asChild variant="outline" size="sm" disabled={uploadingAvatar || isViewer}>
+                      <label htmlFor="avatar-upload" className="cursor-pointer">
+                        {uploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        <span className="ml-2">Upload</span>
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                          disabled={uploadingAvatar || isViewer}
+                        />
+                      </label>
+                    </Button>
+                    {profile.avatarUrl && (
+                      <Button variant="ghost" size="sm" onClick={handleAvatarRemove} disabled={uploadingAvatar || isViewer}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">PNG, JPG up to 5MB</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">{t('settings.fullName')}</Label>
