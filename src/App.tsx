@@ -128,6 +128,7 @@ const OrgGate = () => {
         <Route path="budgets" element={<Budgets />} />
         <Route path="savings" element={<Savings />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="portfolio" element={<PortfolioPage />} />
         <Route path="market" element={<MarketDataPage />} />
         <Route path="ai-insights" element={<AIInsights />} />
