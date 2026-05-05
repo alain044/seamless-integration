@@ -25,6 +25,7 @@ import Chat from "./pages/Chat";
 import Index from "./pages/Index";
 import OnboardingOrg from "./pages/OnboardingOrg";
 import TasksPage from "./pages/TasksPage";
+import ReportsPage from "./pages/ReportsPage";
 import Expenses from "./pages/Expenses";
 import Budgets from "./pages/Budgets";
 import Savings from "./pages/Savings";
