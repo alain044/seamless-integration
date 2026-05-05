@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgSwitcher } from '@/components/OrgSwitcher';
+import { UserAvatarMenu } from '@/components/UserAvatarMenu';
 
 const SignOutButton = ({ collapsed }: { collapsed: boolean }) => {
   const { t } = useTranslation();
