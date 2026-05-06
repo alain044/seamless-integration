@@ -234,13 +234,20 @@ const AuthPage = () => {
   };
 
   const handleGoogle = async () => {
+    if (isGoogleLockedOut()) {
+      const hrs = lockoutHoursRemaining();
+      const locked = { title: 'Too many Google sign-in failures', message: `Please try again in about ${hrs} hour${hrs === 1 ? '' : 's'}, or use email & password to sign in.` };
+      setGoogleError(locked);
+      toast.error(locked.title, { description: locked.message });
+      return;
+    }
     setLoading(true);
     setGoogleError(null);
-    setGoogleAttempts((n) => n + 1);
     try {
       const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
       if (result.error) {
         setLoading(false);
+        recordGoogleFailure();
         const friendly = friendlyGoogleError(result.error.message);
         setGoogleError(friendly);
         toast.error(friendly.title, { description: friendly.message });
@@ -254,9 +261,11 @@ const AuthPage = () => {
         if (totp) { setMfaFactorId(totp.id); setMode('mfa'); setLoading(false); return; }
       }
       setLoading(false);
+      clearGoogleFailures();
       completeSignIn();
     } catch (err: any) {
       setLoading(false);
+      recordGoogleFailure();
       const friendly = friendlyGoogleError(err?.message);
       setGoogleError(friendly);
       toast.error(friendly.title, { description: friendly.message });
