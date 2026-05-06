@@ -8,7 +8,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound, Home, Mail } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound, Home, Mail, AlertCircle, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+/** Map raw OAuth errors to user-friendly copy. */
+const friendlyGoogleError = (raw?: string): { title: string; message: string } => {
+  const msg = (raw ?? '').toLowerCase();
+  if (!raw) return { title: 'Google sign-in failed', message: 'Something went wrong. Please try again.' };
+  if (msg.includes('popup') && msg.includes('closed')) return { title: 'Sign-in cancelled', message: 'The Google window was closed before finishing. Try again to continue.' };
+  if (msg.includes('popup') && msg.includes('block')) return { title: 'Popup blocked', message: 'Your browser blocked the Google popup. Allow popups for this site and retry.' };
+  if (msg.includes('cancel')) return { title: 'Sign-in cancelled', message: 'You cancelled the Google sign-in. Try again whenever you are ready.' };
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) return { title: 'Network problem', message: 'We could not reach Google. Check your internet connection and retry.' };
+  if (msg.includes('timeout') || msg.includes('timed out')) return { title: 'Google took too long', message: 'The request timed out. Please try again.' };
+  if (msg.includes('access_denied') || msg.includes('denied')) return { title: 'Access denied', message: 'Google did not grant access. Make sure to approve the permissions on the next attempt.' };
+  if (msg.includes('invalid') && msg.includes('redirect')) return { title: 'Configuration issue', message: 'The redirect URL is not allowed. Please contact support.' };
+  if (msg.includes('disabled') || msg.includes('not enabled')) return { title: 'Google sign-in unavailable', message: 'Google sign-in is currently disabled. Try email & password instead.' };
+  if (msg.includes('rate') || msg.includes('too many')) return { title: 'Too many attempts', message: 'You have tried a few times. Please wait a moment and retry.' };
+  return { title: 'Google sign-in failed', message: raw };
+};
 
 const hashCode = async (code: string): Promise<string> => {
   const data = new TextEncoder().encode(code);
@@ -35,6 +52,10 @@ const AuthPage = () => {
 
   // Email OTP per-login state
   const [otpCode, setOtpCode] = useState('');
+
+  // Google sign-in error state
+  const [googleError, setGoogleError] = useState<{ title: string; message: string } | null>(null);
+  const [googleAttempts, setGoogleAttempts] = useState(0);
 
   const completeSignIn = () => {
     toast.success('Signed in');
@@ -178,9 +199,17 @@ const AuthPage = () => {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setGoogleError(null);
+    setGoogleAttempts((n) => n + 1);
     try {
       const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-      if (result.error) { setLoading(false); toast.error(result.error.message ?? 'Google sign-in failed'); return; }
+      if (result.error) {
+        setLoading(false);
+        const friendly = friendlyGoogleError(result.error.message);
+        setGoogleError(friendly);
+        toast.error(friendly.title, { description: friendly.message });
+        return;
+      }
       if (result.redirected) return;
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
@@ -192,7 +221,9 @@ const AuthPage = () => {
       completeSignIn();
     } catch (err: any) {
       setLoading(false);
-      toast.error(err.message ?? 'Google sign-in failed');
+      const friendly = friendlyGoogleError(err?.message);
+      setGoogleError(friendly);
+      toast.error(friendly.title, { description: friendly.message });
     }
   };
 
@@ -307,6 +338,27 @@ const AuthPage = () => {
                 </svg>
                 Continue with Google
               </Button>
+              {googleError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>{googleError.title}</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>{googleError.message}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
+                        Try Google again
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setGoogleError(null)}>
+                        Use email instead
+                      </Button>
+                    </div>
+                    {googleAttempts >= 3 && (
+                      <p className="text-xs opacity-80">Still having trouble? Try a different browser, disable popup blockers, or use email & password below.</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
                 <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
