@@ -390,7 +390,7 @@ const AuthPage = () => {
                   <AlertDescription className="space-y-3">
                     <p>{googleError.message}</p>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading}>
+                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading || isGoogleLockedOut()}>
                         {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
                         Try Google again
                       </Button>
