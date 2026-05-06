@@ -53,9 +53,45 @@ const AuthPage = () => {
   // Email OTP per-login state
   const [otpCode, setOtpCode] = useState('');
 
-  // Google sign-in error state
+  // Google sign-in error state — failure count persists for 24h via localStorage
+  const GOOGLE_FAIL_KEY = 'google_signin_failures';
+  const GOOGLE_FAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const GOOGLE_FAIL_LIMIT = 5;
+  const readGoogleFailures = (): { count: number; firstAt: number } => {
+    try {
+      const raw = localStorage.getItem(GOOGLE_FAIL_KEY);
+      if (!raw) return { count: 0, firstAt: 0 };
+      const parsed = JSON.parse(raw);
+      if (!parsed?.firstAt || Date.now() - parsed.firstAt > GOOGLE_FAIL_WINDOW_MS) {
+        localStorage.removeItem(GOOGLE_FAIL_KEY);
+        return { count: 0, firstAt: 0 };
+      }
+      return { count: Number(parsed.count) || 0, firstAt: Number(parsed.firstAt) };
+    } catch { return { count: 0, firstAt: 0 }; }
+  };
   const [googleError, setGoogleError] = useState<{ title: string; message: string } | null>(null);
-  const [googleAttempts, setGoogleAttempts] = useState(0);
+  const [googleAttempts, setGoogleAttempts] = useState(() => readGoogleFailures().count);
+  const recordGoogleFailure = () => {
+    const cur = readGoogleFailures();
+    const next = { count: (cur.firstAt ? cur.count : 0) + 1, firstAt: cur.firstAt || Date.now() };
+    try { localStorage.setItem(GOOGLE_FAIL_KEY, JSON.stringify(next)); } catch {}
+    setGoogleAttempts(next.count);
+    return next;
+  };
+  const clearGoogleFailures = () => {
+    try { localStorage.removeItem(GOOGLE_FAIL_KEY); } catch {}
+    setGoogleAttempts(0);
+  };
+  const isGoogleLockedOut = () => {
+    const { count, firstAt } = readGoogleFailures();
+    return count >= GOOGLE_FAIL_LIMIT && Date.now() - firstAt < GOOGLE_FAIL_WINDOW_MS;
+  };
+  const lockoutHoursRemaining = () => {
+    const { firstAt } = readGoogleFailures();
+    if (!firstAt) return 0;
+    const ms = GOOGLE_FAIL_WINDOW_MS - (Date.now() - firstAt);
+    return Math.max(1, Math.ceil(ms / (60 * 60 * 1000)));
+  };
 
   const completeSignIn = () => {
     toast.success('Signed in');
