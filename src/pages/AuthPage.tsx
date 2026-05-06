@@ -53,9 +53,45 @@ const AuthPage = () => {
   // Email OTP per-login state
   const [otpCode, setOtpCode] = useState('');
 
-  // Google sign-in error state
+  // Google sign-in error state — failure count persists for 24h via localStorage
+  const GOOGLE_FAIL_KEY = 'google_signin_failures';
+  const GOOGLE_FAIL_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const GOOGLE_FAIL_LIMIT = 5;
+  const readGoogleFailures = (): { count: number; firstAt: number } => {
+    try {
+      const raw = localStorage.getItem(GOOGLE_FAIL_KEY);
+      if (!raw) return { count: 0, firstAt: 0 };
+      const parsed = JSON.parse(raw);
+      if (!parsed?.firstAt || Date.now() - parsed.firstAt > GOOGLE_FAIL_WINDOW_MS) {
+        localStorage.removeItem(GOOGLE_FAIL_KEY);
+        return { count: 0, firstAt: 0 };
+      }
+      return { count: Number(parsed.count) || 0, firstAt: Number(parsed.firstAt) };
+    } catch { return { count: 0, firstAt: 0 }; }
+  };
   const [googleError, setGoogleError] = useState<{ title: string; message: string } | null>(null);
-  const [googleAttempts, setGoogleAttempts] = useState(0);
+  const [googleAttempts, setGoogleAttempts] = useState(() => readGoogleFailures().count);
+  const recordGoogleFailure = () => {
+    const cur = readGoogleFailures();
+    const next = { count: (cur.firstAt ? cur.count : 0) + 1, firstAt: cur.firstAt || Date.now() };
+    try { localStorage.setItem(GOOGLE_FAIL_KEY, JSON.stringify(next)); } catch {}
+    setGoogleAttempts(next.count);
+    return next;
+  };
+  const clearGoogleFailures = () => {
+    try { localStorage.removeItem(GOOGLE_FAIL_KEY); } catch {}
+    setGoogleAttempts(0);
+  };
+  const isGoogleLockedOut = () => {
+    const { count, firstAt } = readGoogleFailures();
+    return count >= GOOGLE_FAIL_LIMIT && Date.now() - firstAt < GOOGLE_FAIL_WINDOW_MS;
+  };
+  const lockoutHoursRemaining = () => {
+    const { firstAt } = readGoogleFailures();
+    if (!firstAt) return 0;
+    const ms = GOOGLE_FAIL_WINDOW_MS - (Date.now() - firstAt);
+    return Math.max(1, Math.ceil(ms / (60 * 60 * 1000)));
+  };
 
   const completeSignIn = () => {
     toast.success('Signed in');
@@ -198,13 +234,20 @@ const AuthPage = () => {
   };
 
   const handleGoogle = async () => {
+    if (isGoogleLockedOut()) {
+      const hrs = lockoutHoursRemaining();
+      const locked = { title: 'Too many Google sign-in failures', message: `Please try again in about ${hrs} hour${hrs === 1 ? '' : 's'}, or use email & password to sign in.` };
+      setGoogleError(locked);
+      toast.error(locked.title, { description: locked.message });
+      return;
+    }
     setLoading(true);
     setGoogleError(null);
-    setGoogleAttempts((n) => n + 1);
     try {
       const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
       if (result.error) {
         setLoading(false);
+        recordGoogleFailure();
         const friendly = friendlyGoogleError(result.error.message);
         setGoogleError(friendly);
         toast.error(friendly.title, { description: friendly.message });
@@ -218,9 +261,11 @@ const AuthPage = () => {
         if (totp) { setMfaFactorId(totp.id); setMode('mfa'); setLoading(false); return; }
       }
       setLoading(false);
+      clearGoogleFailures();
       completeSignIn();
     } catch (err: any) {
       setLoading(false);
+      recordGoogleFailure();
       const friendly = friendlyGoogleError(err?.message);
       setGoogleError(friendly);
       toast.error(friendly.title, { description: friendly.message });
@@ -329,7 +374,7 @@ const AuthPage = () => {
             </form>
           ) : (
             <>
-              <Button type="button" variant="outline" className="w-full mb-4" onClick={handleGoogle} disabled={loading}>
+              <Button type="button" variant="outline" className="w-full mb-4" onClick={handleGoogle} disabled={loading || isGoogleLockedOut()}>
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z" />
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.99.66-2.25 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
@@ -345,7 +390,7 @@ const AuthPage = () => {
                   <AlertDescription className="space-y-3">
                     <p>{googleError.message}</p>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading}>
+                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading || isGoogleLockedOut()}>
                         {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
                         Try Google again
                       </Button>
