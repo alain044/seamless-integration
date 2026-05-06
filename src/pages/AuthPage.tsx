@@ -338,6 +338,27 @@ const AuthPage = () => {
                 </svg>
                 Continue with Google
               </Button>
+              {googleError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>{googleError.title}</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>{googleError.message}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={handleGoogle} disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-2 h-3 w-3" />}
+                        Try Google again
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setGoogleError(null)}>
+                        Use email instead
+                      </Button>
+                    </div>
+                    {googleAttempts >= 3 && (
+                      <p className="text-xs opacity-80">Still having trouble? Try a different browser, disable popup blockers, or use email & password below.</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
                 <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div>
