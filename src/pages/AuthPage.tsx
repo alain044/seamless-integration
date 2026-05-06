@@ -53,6 +53,10 @@ const AuthPage = () => {
   // Email OTP per-login state
   const [otpCode, setOtpCode] = useState('');
 
+  // Google sign-in error state
+  const [googleError, setGoogleError] = useState<{ title: string; message: string } | null>(null);
+  const [googleAttempts, setGoogleAttempts] = useState(0);
+
   const completeSignIn = () => {
     toast.success('Signed in');
     navigate('/dashboard');
