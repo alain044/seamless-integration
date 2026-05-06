@@ -8,7 +8,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound, Home, Mail } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ShieldCheck, KeyRound, Home, Mail, AlertCircle, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+/** Map raw OAuth errors to user-friendly copy. */
+const friendlyGoogleError = (raw?: string): { title: string; message: string } => {
+  const msg = (raw ?? '').toLowerCase();
+  if (!raw) return { title: 'Google sign-in failed', message: 'Something went wrong. Please try again.' };
+  if (msg.includes('popup') && msg.includes('closed')) return { title: 'Sign-in cancelled', message: 'The Google window was closed before finishing. Try again to continue.' };
+  if (msg.includes('popup') && msg.includes('block')) return { title: 'Popup blocked', message: 'Your browser blocked the Google popup. Allow popups for this site and retry.' };
+  if (msg.includes('cancel')) return { title: 'Sign-in cancelled', message: 'You cancelled the Google sign-in. Try again whenever you are ready.' };
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) return { title: 'Network problem', message: 'We could not reach Google. Check your internet connection and retry.' };
+  if (msg.includes('timeout') || msg.includes('timed out')) return { title: 'Google took too long', message: 'The request timed out. Please try again.' };
+  if (msg.includes('access_denied') || msg.includes('denied')) return { title: 'Access denied', message: 'Google did not grant access. Make sure to approve the permissions on the next attempt.' };
+  if (msg.includes('invalid') && msg.includes('redirect')) return { title: 'Configuration issue', message: 'The redirect URL is not allowed. Please contact support.' };
+  if (msg.includes('disabled') || msg.includes('not enabled')) return { title: 'Google sign-in unavailable', message: 'Google sign-in is currently disabled. Try email & password instead.' };
+  if (msg.includes('rate') || msg.includes('too many')) return { title: 'Too many attempts', message: 'You have tried a few times. Please wait a moment and retry.' };
+  return { title: 'Google sign-in failed', message: raw };
+};
 
 const hashCode = async (code: string): Promise<string> => {
   const data = new TextEncoder().encode(code);
