@@ -1,32 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-interface SavingsGoal { id: number; name: string; target: number; saved: number; icon: string; }
-
-const initialGoals: SavingsGoal[] = [
-  { id: 1, name: 'Emergency Fund', target: 10000, saved: 6700, icon: '🛡️' },
-  { id: 2, name: 'Vacation', target: 3000, saved: 1200, icon: '✈️' },
-  { id: 3, name: 'New Laptop', target: 2000, saved: 1800, icon: '💻' },
-  { id: 4, name: 'Car Down Payment', target: 5000, saved: 720, icon: '🚗' },
-];
+interface SavingsGoal { id: string; name: string; target: number; saved: number; icon: string; }
 
 const Savings = () => {
   const { t } = useTranslation();
-  const [goals, setGoals] = useState(initialGoals);
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({ name: '', target: '' });
 
-  const totalSaved = goals.reduce((s, g) => s + g.saved, 0);
-  const totalTarget = goals.reduce((s, g) => s + g.target, 0);
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from('savings_goals').select('*').order('created_at', { ascending: true });
+      if (error) toast.error(error.message);
+      else setGoals((data || []) as SavingsGoal[]);
+      setLoading(false);
+    })();
+  }, []);
 
-  const handleAdd = () => {
+  const totalSaved = goals.reduce((s, g) => s + Number(g.saved), 0);
+  const totalTarget = goals.reduce((s, g) => s + Number(g.target), 0);
+
+  const handleAdd = async () => {
     if (!newGoal.name || !newGoal.target) return;
-    setGoals((prev) => [...prev, { id: Date.now(), name: newGoal.name, target: parseFloat(newGoal.target), saved: 0, icon: '🎯' }]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error('Sign in required'); return; }
+    const { data, error } = await supabase.from('savings_goals').insert({
+      user_id: user.id,
+      name: newGoal.name,
+      target: parseFloat(newGoal.target),
+      saved: 0,
+      icon: '🎯',
+    }).select().single();
+    if (error) { toast.error(error.message); return; }
+    setGoals((prev) => [...prev, data as SavingsGoal]);
     setNewGoal({ name: '', target: '' });
     setDialogOpen(false);
   };
@@ -58,9 +73,10 @@ const Savings = () => {
         <p className="text-2xl font-bold text-card-foreground">${totalSaved.toLocaleString()} / ${totalTarget.toLocaleString()}</p>
       </div>
 
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {goals.map((goal, i) => {
-          const pct = Math.min((goal.saved / goal.target) * 100, 100);
+          const pct = Math.min((Number(goal.saved) / Number(goal.target)) * 100, 100);
           return (
             <motion.div
               key={goal.id}
@@ -74,7 +90,7 @@ const Savings = () => {
                 <div>
                   <h3 className="font-semibold text-card-foreground">{goal.name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    ${goal.saved.toLocaleString()} {t('savings.of')} ${goal.target.toLocaleString()}
+                    ${Number(goal.saved).toLocaleString()} {t('savings.of')} ${Number(goal.target).toLocaleString()}
                   </p>
                 </div>
               </div>

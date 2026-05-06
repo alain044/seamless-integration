@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
@@ -7,31 +7,44 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-interface Budget { id: number; category: string; limit: number; spent: number; }
-
-const initialBudgets: Budget[] = [
-  { id: 1, category: 'Food', limit: 800, spent: 540 },
-  { id: 2, category: 'Transport', limit: 400, spent: 320 },
-  { id: 3, category: 'Entertainment', limit: 200, spent: 180 },
-  { id: 4, category: 'Utilities', limit: 300, spent: 250 },
-  { id: 5, category: 'Shopping', limit: 500, spent: 120 },
-];
+interface Budget { id: string; category: string; limit_amount: number; spent: number; }
 
 const categoriesList = ['Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Other'];
 
 const Budgets = () => {
   const { t } = useTranslation();
-  const [budgets, setBudgets] = useState(initialBudgets);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newBudget, setNewBudget] = useState({ category: 'Food', limit: '' });
 
-  const totalBudget = budgets.reduce((s, b) => s + b.limit, 0);
-  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from('budgets').select('*').order('created_at', { ascending: true });
+      if (error) toast.error(error.message);
+      else setBudgets((data || []) as Budget[]);
+      setLoading(false);
+    })();
+  }, []);
 
-  const handleAdd = () => {
+  const totalBudget = budgets.reduce((s, b) => s + Number(b.limit_amount), 0);
+  const totalSpent = budgets.reduce((s, b) => s + Number(b.spent), 0);
+
+  const handleAdd = async () => {
     if (!newBudget.limit) return;
-    setBudgets((prev) => [...prev, { id: Date.now(), category: newBudget.category, limit: parseFloat(newBudget.limit), spent: 0 }]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error('Sign in required'); return; }
+    const { data, error } = await supabase.from('budgets').insert({
+      user_id: user.id,
+      category: newBudget.category,
+      limit_amount: parseFloat(newBudget.limit),
+      spent: 0,
+    }).select().single();
+    if (error) { toast.error(error.message); return; }
+    setBudgets((prev) => [...prev, data as Budget]);
     setNewBudget({ category: 'Food', limit: '' });
     setDialogOpen(false);
   };
@@ -72,9 +85,10 @@ const Budgets = () => {
         </div>
       </div>
 
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {budgets.map((budget, i) => {
-          const pct = Math.min((budget.spent / budget.limit) * 100, 100);
+          const pct = Math.min((Number(budget.spent) / Number(budget.limit_amount)) * 100, 100);
           return (
             <motion.div
               key={budget.id}
@@ -86,7 +100,7 @@ const Budgets = () => {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-card-foreground">{budget.category}</h3>
                 <span className="text-sm text-muted-foreground">
-                  ${budget.spent} {t('budgets.of')} ${budget.limit}
+                  ${Number(budget.spent)} {t('budgets.of')} ${Number(budget.limit_amount)}
                 </span>
               </div>
               <Progress value={pct} className="h-2" />
