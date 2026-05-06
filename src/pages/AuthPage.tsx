@@ -199,9 +199,17 @@ const AuthPage = () => {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setGoogleError(null);
+    setGoogleAttempts((n) => n + 1);
     try {
       const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
-      if (result.error) { setLoading(false); toast.error(result.error.message ?? 'Google sign-in failed'); return; }
+      if (result.error) {
+        setLoading(false);
+        const friendly = friendlyGoogleError(result.error.message);
+        setGoogleError(friendly);
+        toast.error(friendly.title, { description: friendly.message });
+        return;
+      }
       if (result.redirected) return;
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aal?.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
@@ -213,7 +221,9 @@ const AuthPage = () => {
       completeSignIn();
     } catch (err: any) {
       setLoading(false);
-      toast.error(err.message ?? 'Google sign-in failed');
+      const friendly = friendlyGoogleError(err?.message);
+      setGoogleError(friendly);
+      toast.error(friendly.title, { description: friendly.message });
     }
   };
 
