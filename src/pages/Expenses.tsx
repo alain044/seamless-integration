@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { Plus, Search, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Expense {
-  id: number;
+  id: string;
   name: string;
   category: string;
   amount: number;
@@ -17,25 +19,26 @@ interface Expense {
   type: 'expense' | 'income';
 }
 
-const initialExpenses: Expense[] = [
-  { id: 1, name: 'Grocery Store', category: 'Food', amount: 85.20, date: '2026-03-27', type: 'expense' },
-  { id: 2, name: 'Salary', category: 'Income', amount: 4500.00, date: '2026-03-26', type: 'income' },
-  { id: 3, name: 'Netflix', category: 'Entertainment', amount: 15.99, date: '2026-03-25', type: 'expense' },
-  { id: 4, name: 'Electric Bill', category: 'Utilities', amount: 120.00, date: '2026-03-24', type: 'expense' },
-  { id: 5, name: 'Freelance Work', category: 'Income', amount: 850.00, date: '2026-03-23', type: 'income' },
-  { id: 6, name: 'Gas Station', category: 'Transport', amount: 45.00, date: '2026-03-22', type: 'expense' },
-];
-
 const categories = ['Food', 'Transport', 'Entertainment', 'Utilities', 'Health', 'Shopping', 'Income', 'Other'];
 
 const Expenses = () => {
   const { t } = useTranslation();
   const { isViewer } = useOrganization();
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newExpense, setNewExpense] = useState<{ name: string; category: string; amount: string; type: 'expense' | 'income' }>({ name: '', category: 'Food', amount: '', type: 'expense' });
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+      if (error) toast.error(error.message);
+      else setExpenses((data || []) as Expense[]);
+      setLoading(false);
+    })();
+  }, []);
 
   const filtered = expenses.filter((e) => {
     const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
@@ -43,12 +46,21 @@ const Expenses = () => {
     return matchSearch && matchFilter;
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newExpense.name || !newExpense.amount) return;
-    setExpenses((prev) => [
-      { id: Date.now(), name: newExpense.name, category: newExpense.category, amount: parseFloat(newExpense.amount), date: new Date().toISOString().slice(0, 10), type: newExpense.type },
-      ...prev,
-    ]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error('Sign in required'); return; }
+    const row = {
+      user_id: user.id,
+      name: newExpense.name,
+      category: newExpense.category,
+      amount: parseFloat(newExpense.amount),
+      date: new Date().toISOString().slice(0, 10),
+      type: newExpense.type,
+    };
+    const { data, error } = await supabase.from('expenses').insert(row).select().single();
+    if (error) { toast.error(error.message); return; }
+    setExpenses((prev) => [data as Expense, ...prev]);
     setNewExpense({ name: '', category: 'Food', amount: '', type: 'expense' });
     setDialogOpen(false);
   };
@@ -103,6 +115,8 @@ const Expenses = () => {
       </div>
 
       <div className="space-y-2">
+        {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!loading && filtered.length === 0 && <p className="text-sm text-muted-foreground">No transactions yet.</p>}
         {filtered.map((expense, i) => (
           <motion.div
             key={expense.id}
@@ -121,7 +135,7 @@ const Expenses = () => {
               </div>
             </div>
             <p className={`font-semibold ${expense.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
-              {expense.type === 'income' ? '+' : '-'}${expense.amount.toFixed(2)}
+              {expense.type === 'income' ? '+' : '-'}${Number(expense.amount).toFixed(2)}
             </p>
           </motion.div>
         ))}
