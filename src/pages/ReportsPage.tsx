@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, Download, Loader2, ShieldAlert } from 'lucide-react';
+import { FileSpreadsheet, Download, Loader2, ShieldAlert, FileText } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type ReportType = 'tasks' | 'holdings' | 'expenses_summary';
 
@@ -144,6 +146,35 @@ const ReportsPage = () => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    setLoading(true);
+    try {
+      const rows = preview.length ? preview : await generate();
+      if (!rows.length) { toast.info('No data to export.'); return; }
+      const doc = new jsPDF();
+      const stamp = new Date().toISOString().slice(0, 10);
+      doc.setFontSize(16);
+      doc.text(`${type.replace('_', ' ').toUpperCase()} Report`, 14, 18);
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`${organization?.name ?? ''} · Range: ${from} to ${to} · Generated: ${stamp}`, 14, 25);
+      const cols = Object.keys(rows[0]);
+      autoTable(doc, {
+        startY: 30,
+        head: [cols],
+        body: rows.map((r) => cols.map((c) => r[c] === null || r[c] === undefined ? '' : String(r[c]))),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+      doc.save(`${type}-${stamp}.pdf`);
+      toast.success('PDF downloaded.');
+    } catch (e: any) {
+      toast.error(e.message ?? 'Failed to export PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const cols = preview[0] ? Object.keys(preview[0]) : [];
 
   return (
@@ -188,8 +219,11 @@ const ReportsPage = () => {
               <Button onClick={handlePreview} disabled={loading} variant="outline" className="flex-1">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Preview'}
               </Button>
-              <Button onClick={handleDownload} disabled={loading} className="flex-1">
+              <Button onClick={handleDownload} disabled={loading} variant="secondary" className="flex-1">
                 <Download className="w-4 h-4 mr-1" /> CSV
+              </Button>
+              <Button onClick={handleDownloadPDF} disabled={loading} className="flex-1">
+                <FileText className="w-4 h-4 mr-1" /> PDF
               </Button>
             </div>
           </div>

@@ -236,8 +236,8 @@ const TasksPage = () => {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>{t('tasks.fields.amount')}</Label>
-                      <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                      <Label>{t('tasks.fields.amount')} <span className="text-xs text-muted-foreground font-normal">(optional)</span></Label>
+                      <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
                     </div>
                     <div className="space-y-1.5">
                       <Label>{t('tasks.fields.dueDate')}</Label>

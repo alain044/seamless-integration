@@ -39,6 +39,9 @@ import SystemStatus from "./pages/SystemStatus";
 import AuthPage from "./pages/AuthPage";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AdminVerifyPage from "./pages/AdminVerifyPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
+import { AdminGuard } from "./components/admin/AdminGuard";
 import "./i18n";
 
 const queryClient = new QueryClient();
@@ -138,6 +141,8 @@ const OrgGate = () => {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="status" element={<SystemStatus />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin/verify" element={<AdminVerifyPage />} />
+        <Route path="admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>

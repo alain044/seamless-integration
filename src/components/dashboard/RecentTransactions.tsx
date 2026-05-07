@@ -1,16 +1,34 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-const transactions = [
-  { id: 1, name: 'Grocery Store', amount: -85.20, date: '2026-03-27', type: 'expense' },
-  { id: 2, name: 'Salary', amount: 4500.00, date: '2026-03-26', type: 'income' },
-  { id: 3, name: 'Netflix', amount: -15.99, date: '2026-03-25', type: 'expense' },
-  { id: 4, name: 'Electric Bill', amount: -120.00, date: '2026-03-24', type: 'expense' },
-  { id: 5, name: 'Freelance Work', amount: 850.00, date: '2026-03-23', type: 'income' },
-];
+interface Tx {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  type: 'expense' | 'income';
+}
 
 const RecentTransactions = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<Tx[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from('expenses')
+        .select('id, name, amount, date, type')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(5);
+      setTransactions((data || []) as Tx[]);
+    })();
+  }, [user]);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -18,6 +36,9 @@ const RecentTransactions = () => {
         {t('dashboard.recentTransactions')}
       </h3>
       <div className="space-y-3">
+        {transactions.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">No transactions yet.</p>
+        )}
         {transactions.map((tx) => (
           <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
             <div className="flex items-center gap-3">
@@ -33,8 +54,8 @@ const RecentTransactions = () => {
                 <p className="text-xs text-muted-foreground">{tx.date}</p>
               </div>
             </div>
-            <p className={`text-sm font-semibold ${tx.amount > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-              {tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
+            <p className={`text-sm font-semibold ${tx.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
+              {tx.type === 'income' ? '+' : '-'}${Number(tx.amount).toFixed(2)}
             </p>
           </div>
         ))}

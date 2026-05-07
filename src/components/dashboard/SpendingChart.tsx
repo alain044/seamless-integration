@@ -1,17 +1,41 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const data = [
-  { month: 'Jan', spending: 1800 },
-  { month: 'Feb', spending: 2200 },
-  { month: 'Mar', spending: 1900 },
-  { month: 'Apr', spending: 2847 },
-  { month: 'May', spending: 2100 },
-  { month: 'Jun', spending: 2400 },
-];
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SpendingChart = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const [data, setData] = useState<{ month: string; spending: number }[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const since = new Date();
+      since.setMonth(since.getMonth() - 5);
+      since.setDate(1);
+      const { data: rows } = await supabase
+        .from('expenses')
+        .select('amount, date, type')
+        .eq('user_id', user.id)
+        .eq('type', 'expense')
+        .gte('date', since.toISOString().slice(0, 10));
+      const buckets: Record<string, number> = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = d.toLocaleString('default', { month: 'short' });
+        buckets[key] = 0;
+      }
+      (rows || []).forEach((r: any) => {
+        const d = new Date(r.date);
+        const key = d.toLocaleString('default', { month: 'short' });
+        if (key in buckets) buckets[key] += Number(r.amount);
+      });
+      setData(Object.entries(buckets).map(([month, spending]) => ({ month, spending })));
+    })();
+  }, [user]);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
