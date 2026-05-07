@@ -1,1 +1,7 @@
 project_id = "svixhxkbroelwmpxynjy"
+
+[functions.admin-stepup]
+verify_jwt = true
+
+[functions.admin-check]
+verify_jwt = true
