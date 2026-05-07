@@ -146,27 +146,56 @@ const SettingsPage = () => {
     return watchNotificationPermission(setPushPermission);
   }, []);
 
+  const autoCropToSquare = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => { img.src = reader.result as string; };
+      reader.onerror = () => reject(new Error('Failed to read image'));
+      img.onload = () => {
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        const target = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = target;
+        canvas.height = target;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas not supported'));
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Crop failed')), 'image/jpeg', 0.9);
+      };
+      img.onerror = () => reject(new Error('Invalid image'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !user) return;
     if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return; }
     setUploadingAvatar(true);
-    const ext = file.name.split('.').pop() || 'png';
-    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, cacheControl: '3600' });
-    if (upErr) { setUploadingAvatar(false); toast.error(upErr.message); return; }
-    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
-    const url = pub.publicUrl;
-    const { error: dbErr } = await supabase.from('profiles').upsert({
-      user_id: user.id, avatar_url: url,
-    }, { onConflict: 'user_id' });
-    setUploadingAvatar(false);
-    if (dbErr) { toast.error(dbErr.message); return; }
-    setProfile((p) => ({ ...p, avatarUrl: url }));
-    setInitialProfile((p) => ({ ...p, avatarUrl: url }));
-    toast.success('Profile photo updated');
+    try {
+      const cropped = await autoCropToSquare(file);
+      const path = `${user.id}/avatar-${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, cropped, { upsert: true, cacheControl: '3600', contentType: 'image/jpeg' });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      const url = `${pub.publicUrl}?v=${Date.now()}`;
+      const { error: dbErr } = await supabase.from('profiles').upsert({
+        user_id: user.id, avatar_url: url,
+      }, { onConflict: 'user_id' });
+      if (dbErr) throw dbErr;
+      setProfile((p) => ({ ...p, avatarUrl: url }));
+      setInitialProfile((p) => ({ ...p, avatarUrl: url }));
+      toast.success('Profile photo updated');
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleAvatarRemove = async () => {
