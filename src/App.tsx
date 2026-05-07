@@ -141,6 +141,8 @@ const OrgGate = () => {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="status" element={<SystemStatus />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin/verify" element={<AdminVerifyPage />} />
+        <Route path="admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
