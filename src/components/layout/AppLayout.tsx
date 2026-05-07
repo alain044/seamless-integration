@@ -75,6 +75,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     { to: '/dashboard/ai-insights', icon: Sparkles, label: t('nav.aiInsights') },
     { to: '/dashboard/notifications', icon: Bell, label: t('nav.notifications') },
     { to: '/dashboard/status', icon: Activity, label: 'System Status' },
+    { to: '/dashboard/admin', icon: ShieldCheck, label: 'Admin' },
     { to: '/dashboard/settings', icon: Settings, label: t('nav.settings') },
   ];
 
