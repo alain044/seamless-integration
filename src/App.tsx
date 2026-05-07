@@ -39,6 +39,9 @@ import SystemStatus from "./pages/SystemStatus";
 import AuthPage from "./pages/AuthPage";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AdminVerifyPage from "./pages/AdminVerifyPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
+import { AdminGuard } from "./components/admin/AdminGuard";
 import "./i18n";
 
 const queryClient = new QueryClient();
