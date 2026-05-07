@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, Download, Loader2, ShieldAlert } from 'lucide-react';
+import { FileSpreadsheet, Download, Loader2, ShieldAlert, FileText } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type ReportType = 'tasks' | 'holdings' | 'expenses_summary';
 
