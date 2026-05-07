@@ -219,8 +219,11 @@ const ReportsPage = () => {
               <Button onClick={handlePreview} disabled={loading} variant="outline" className="flex-1">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Preview'}
               </Button>
-              <Button onClick={handleDownload} disabled={loading} className="flex-1">
+              <Button onClick={handleDownload} disabled={loading} variant="secondary" className="flex-1">
                 <Download className="w-4 h-4 mr-1" /> CSV
+              </Button>
+              <Button onClick={handleDownloadPDF} disabled={loading} className="flex-1">
+                <FileText className="w-4 h-4 mr-1" /> PDF
               </Button>
             </div>
           </div>
