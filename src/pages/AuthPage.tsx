@@ -93,9 +93,12 @@ const AuthPage = () => {
     return Math.max(1, Math.ceil(ms / (60 * 60 * 1000)));
   };
 
-  const completeSignIn = () => {
+  const completeSignIn = async () => {
+    // Ensure session is fully propagated before navigating to avoid the guard
+    // bouncing back to /auth due to a render-race.
+    await supabase.auth.getSession();
     toast.success('Signed in');
-    navigate('/dashboard');
+    navigate('/dashboard', { replace: true });
   };
 
   /** After a successful password verification, send a one-time code to the
@@ -153,7 +156,7 @@ const AuthPage = () => {
     const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    completeSignIn();
+    await completeSignIn();
   };
 
   const resendOtp = async () => {
@@ -216,7 +219,7 @@ const AuthPage = () => {
         await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
         toast.success('Recovery code accepted. Please re-enroll 2FA from Settings.');
         setLoading(false);
-        completeSignIn();
+        await completeSignIn();
         return;
       }
       const digits = mfaCode.replace(/\D/g, '');
@@ -226,7 +229,7 @@ const AuthPage = () => {
       const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: digits });
       if (vErr) throw vErr;
       setLoading(false);
-      completeSignIn();
+      await completeSignIn();
     } catch (err: any) {
       setLoading(false);
       toast.error(err.message);
@@ -262,7 +265,7 @@ const AuthPage = () => {
       }
       setLoading(false);
       clearGoogleFailures();
-      completeSignIn();
+      await completeSignIn();
     } catch (err: any) {
       setLoading(false);
       recordGoogleFailure();

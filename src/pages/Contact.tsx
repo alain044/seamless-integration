@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Mail, Phone, MapPin, Send, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, MapPin, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const contactSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name must be under 100 characters"),
@@ -22,8 +23,9 @@ export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = contactSchema.safeParse(form);
     if (!result.success) {
@@ -36,15 +38,24 @@ export default function Contact() {
       return;
     }
     setErrors({});
-    setSubmitted(true);
-    toast.success("Message sent! We'll get back to you soon.");
-    setForm({ name: "", email: "", message: "" });
-    setTimeout(() => setSubmitted(false), 5000);
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke('send-contact-message', { body: form });
+      if (error) throw error;
+      setSubmitted(true);
+      toast.success("Message sent! We'll get back to you soon.");
+      setForm({ name: "", email: "", message: "" });
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Couldn't send message. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const contactInfo = [
     { icon: Mail, label: "Email", value: "hello@savvyai.com" },
-    { icon: Phone, label: "Phone", value: "+(250) 780 407 924" },
+    { icon: Phone, label: "Phone", value: "+250 798 254 398" },
     { icon: MapPin, label: "Location", value: "Kigali, Rwanda" },
   ];
 
@@ -148,10 +159,12 @@ export default function Contact() {
 
               <Button
                 type="submit"
+                disabled={sending}
                 className="w-full gradient-primary text-primary-foreground border-0 shadow-glow hover:scale-[1.02] transition-transform"
                 size="lg"
               >
-                <Send className="h-4 w-4 mr-2" /> Send Message
+                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                {sending ? "Sending..." : "Send Message"}
               </Button>
             </motion.form>
           </div>

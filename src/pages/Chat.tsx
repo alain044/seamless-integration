@@ -8,12 +8,20 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/finance-chat`;
-const FREE_LIMIT = 8;
+const ANON_FREE_LIMIT = 8;
 const COUNT_KEY = "savvy_free_msg_count";
+
+const formatReset = (ms: number) => {
+  if (ms <= 0) return "now";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 
 const SUGGESTIONS = [
   "How should I start investing with $1,000?",
@@ -30,7 +38,8 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<{ msg: string; retry: () => void } | null>(null);
-  const [freeCount, setFreeCount] = useState(() => Number(localStorage.getItem(COUNT_KEY) ?? "0"));
+  const [anonCount, setAnonCount] = useState(() => Number(localStorage.getItem(COUNT_KEY) ?? "0"));
+  const [dbUsage, setDbUsage] = useState<{ remaining: number; limit: number; reset_in_ms: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Context payload passed via location.state OR query params (dashboard CTA)
@@ -53,13 +62,27 @@ export default function Chat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const remaining = user ? Infinity : Math.max(0, FREE_LIMIT - freeCount);
-  const limitReached = !user && remaining === 0;
+  // Load DB-backed usage for signed-in users
+  useEffect(() => {
+    if (!user) { setDbUsage(null); return; }
+    (async () => {
+      const { data } = await supabase.functions.invoke('ai-usage-check', { body: { action: 'check' } });
+      if (data) setDbUsage(data as any);
+    })();
+  }, [user]);
+
+  const remaining = user
+    ? (dbUsage ? dbUsage.remaining : Infinity)
+    : Math.max(0, ANON_FREE_LIMIT - anonCount);
+  const limit = user ? (dbUsage?.limit ?? null) : ANON_FREE_LIMIT;
+  const limitReached = remaining === 0;
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
     if (limitReached) {
-      toast.error("Sign in to keep chatting with Savvy.");
+      toast.error(user
+        ? `Daily limit reached. Resets in ${formatReset(dbUsage?.reset_in_ms ?? 0)}.`
+        : "Sign in to keep chatting with Savvy.");
       return;
     }
 
@@ -70,9 +93,19 @@ export default function Chat() {
     setIsLoading(true);
     setLastError(null);
 
-    if (!user) {
-      const next = freeCount + 1;
-      setFreeCount(next);
+    // Consume one credit
+    if (user) {
+      const { data, error } = await supabase.functions.invoke('ai-usage-check', { body: { action: 'consume' } });
+      if (error || (data && data.allowed === false)) {
+        setIsLoading(false);
+        setDbUsage(data as any);
+        toast.error(`Daily limit reached. Resets in ${formatReset((data as any)?.reset_in_ms ?? 0)}.`);
+        return;
+      }
+      setDbUsage(data as any);
+    } else {
+      const next = anonCount + 1;
+      setAnonCount(next);
       localStorage.setItem(COUNT_KEY, String(next));
     }
 
@@ -148,12 +181,16 @@ export default function Chat() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full pt-20 pb-4 px-4">
-        {!user && (
+        {!user ? (
           <div className="text-xs text-muted-foreground mb-2 text-center">
-            Free preview · {remaining === Infinity ? '∞' : remaining} of {FREE_LIMIT} messages remaining ·{' '}
-            <Link to="/auth" className="text-primary hover:underline">Sign in for unlimited</Link>
+            Free preview · {Math.max(0, ANON_FREE_LIMIT - anonCount)} of {ANON_FREE_LIMIT} messages remaining ·{' '}
+            <Link to="/auth" className="text-primary hover:underline">Sign in for more</Link>
           </div>
-        )}
+        ) : dbUsage ? (
+          <div className="text-xs text-muted-foreground mb-2 text-center">
+            {dbUsage.remaining} of {dbUsage.limit} messages remaining · resets in {formatReset(dbUsage.reset_in_ms)}
+          </div>
+        ) : null}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4">
           {messages.length === 0 && (
@@ -234,20 +271,31 @@ export default function Chat() {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Lock className="w-5 h-5 text-primary" />
             </div>
-            <div>
-              <h3 className="font-semibold">You've reached the free limit</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create a free account to keep chatting and unlock the full finance dashboard.
-              </p>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button asChild className="gradient-primary text-primary-foreground border-0">
-                <Link to="/auth?mode=signup">Create free account</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/auth">Sign in</Link>
-              </Button>
-            </div>
+            {user ? (
+              <div>
+                <h3 className="font-semibold">Daily limit reached</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You've used all your Ask Savvy messages. Limit resets in {formatReset(dbUsage?.reset_in_ms ?? 0)}.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h3 className="font-semibold">You've reached the free limit</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Create a free account to keep chatting and unlock the full finance dashboard.
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <Button asChild className="gradient-primary text-primary-foreground border-0">
+                    <Link to="/auth?mode=signup">Create free account</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link to="/auth">Sign in</Link>
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex gap-2 pt-2 border-t border-border">

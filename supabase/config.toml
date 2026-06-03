@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.admin-check]
 verify_jwt = true
+
+[functions.send-contact-message]
+verify_jwt = false
+
+[functions.ai-usage-check]
+verify_jwt = false
