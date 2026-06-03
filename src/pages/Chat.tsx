@@ -271,20 +271,31 @@ export default function Chat() {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Lock className="w-5 h-5 text-primary" />
             </div>
-            <div>
-              <h3 className="font-semibold">You've reached the free limit</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create a free account to keep chatting and unlock the full finance dashboard.
-              </p>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button asChild className="gradient-primary text-primary-foreground border-0">
-                <Link to="/auth?mode=signup">Create free account</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/auth">Sign in</Link>
-              </Button>
-            </div>
+            {user ? (
+              <div>
+                <h3 className="font-semibold">Daily limit reached</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You've used all your Ask Savvy messages. Limit resets in {formatReset(dbUsage?.reset_in_ms ?? 0)}.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h3 className="font-semibold">You've reached the free limit</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Create a free account to keep chatting and unlock the full finance dashboard.
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <Button asChild className="gradient-primary text-primary-foreground border-0">
+                    <Link to="/auth?mode=signup">Create free account</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link to="/auth">Sign in</Link>
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex gap-2 pt-2 border-t border-border">
