@@ -93,9 +93,12 @@ const AuthPage = () => {
     return Math.max(1, Math.ceil(ms / (60 * 60 * 1000)));
   };
 
-  const completeSignIn = () => {
+  const completeSignIn = async () => {
+    // Ensure session is fully propagated before navigating to avoid the guard
+    // bouncing back to /auth due to a render-race.
+    await supabase.auth.getSession();
     toast.success('Signed in');
-    navigate('/dashboard');
+    navigate('/dashboard', { replace: true });
   };
 
   /** After a successful password verification, send a one-time code to the
@@ -153,7 +156,7 @@ const AuthPage = () => {
     const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    completeSignIn();
+    await completeSignIn();
   };
 
   const resendOtp = async () => {
