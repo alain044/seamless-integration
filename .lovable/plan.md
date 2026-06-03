@@ -1,59 +1,52 @@
-## Scope
+## 1. Contact form — deliver to hakizimanaalainpacifique@gmail.com
 
-Six related changes. Grouping for clarity:
+- Keep the visible email `hello@savvyai.com` unchanged on `/contact`.
+- Update phone shown to `+250 798 254 398`.
+- Create edge function `send-contact-message` that:
+  - Validates name/email/message with Zod.
+  - Sends the email to `hakizimanaalainpacifique@gmail.com` (hard-coded recipient, with reply-to = submitter).
+- For delivery I'll use **Lovable's built-in transactional emails** (`scaffold_transactional_email`). This requires a verified sender domain. If you don't have one yet, I'll open the email-setup dialog so you can configure one quickly (DNS may take time to verify, but the queue stores messages and sends once verified).
+  - Alternative if you don't want to set up a domain: I can wire it to **Resend** or **Mailgun** via the standard connector instead. Tell me which you prefer.
+- `Contact.tsx` form `handleSubmit` will invoke the edge function and show success/error toasts.
 
-### 1. Tasks: amount optional
-- `src/pages/TasksPage.tsx`: remove required validation on amount; allow blank → null on insert.
+## 2. Login redirect loop
 
-### 2. Expenses ↔ Budgets sync
-When a user adds an expense whose `category` matches an existing budget category, increment that budget's `spent`. When updated/deleted, adjust accordingly.
-- Implement via a Postgres trigger on `expenses` (INSERT / UPDATE / DELETE) that updates `budgets.spent` for the matching `(user_id, category)`. This keeps it consistent regardless of client.
-- Backfill existing data once: recompute `budgets.spent` from current expenses.
+- Audit the post-login flow. Current flow: `AuthPage` calls `navigate('/dashboard')`, `ProtectedDashboard` checks `user` then `email_confirmed_at`. The likely cause: after sign-in the auth listener fires `INITIAL_SESSION` then `SIGNED_IN`, but `navigate` runs before state propagates → guard sees `!user` once and bounces to `/auth`. Fix:
+  - In `AuthPage` signIn handler, await `supabase.auth.getSession()` after `signInWithPassword` succeeds, then `navigate('/dashboard', { replace: true })`.
+  - In `AuthRoute`, also gate on `loading` to avoid a flash redirect.
+  - Verify `localStorage` persistence is enabled (it is in `client.ts`).
+- Will repro and confirm fix via preview.
 
-### 3. Profile picture auto-crop
-- `src/pages/SettingsPage.tsx` avatar upload: before upload, draw image to a square canvas (center-crop, resize to 512×512, export as JPEG ~0.9). Upload the cropped blob instead of the raw file. No UI cropper needed — fully automatic.
+## 3. Password reset flow
 
-### 4. Dashboard with real data
-- `src/pages/Index.tsx`: replace mocked numbers. Fetch from Supabase:
-  - Total balance = sum(income) − sum(expense) from `expenses`
-  - Monthly income/expense (current month)
-  - Budgets summary (sum spent / sum limit)
-  - Savings progress (sum saved / sum target)
-  - Recent transactions (latest 5 expenses)
-  - Spending by category for chart
-- Update `RecentTransactions` and `SpendingChart` to accept props (or fetch themselves).
+- `/reset-password` page already exists and uses `supabase.auth.updateUser({ password })`. I'll harden it:
+  - Confirm route is public (it is).
+  - Require an active recovery session before allowing submit (already checked).
+  - Add token-expiry handling: if `getSession()` returns null and URL has no `type=recovery`, show "Link expired — request a new one" with a button back to `/auth?mode=forgot`.
+  - Server-side, Supabase Auth hashes passwords (bcrypt) automatically — no extra work needed for hashing; will state this in the UI copy.
+  - Add password-strength enforcement (already partly done) and disallow reusing the current password by attempting `signInWithPassword` then surfacing message if same.
 
-### 5. Reports as PDF
-- `src/pages/ReportsPage.tsx`: add "Export PDF" button using `jspdf` + `jspdf-autotable`. Generate a PDF with org name, date range, expenses table, totals, and budget summary.
+## 4. Ask Savvy AI message limit → DB
 
-### 6. Step-up auth for Admin (owner only)
-- New route `/dashboard/admin` — owner-only, requires fresh step-up verification.
-- New route `/dashboard/admin/verify` — second auth step (re-enter password; owners with TOTP enrolled use TOTP code instead).
-- DB:
-  - `admin_sessions` table: `id, user_id, organization_id, verified_at, expires_at` (15-min TTL). RLS: own rows only. Insert via edge function only.
-  - `admin_access_log` table: `id, user_id, organization_id, action, success, ip, user_agent, created_at`. RLS: owners view own org rows; insert by service role.
-- Edge function `admin-stepup` (verify_jwt = true in code):
-  - Validates JWT, checks role = owner via `has_role`.
-  - Accepts `{ password }` or `{ totp_code }`. Verifies password via `supabase.auth.signInWithPassword` server-side using the user's email; or verifies TOTP via `auth.mfa.challengeAndVerify`.
-  - On success: inserts `admin_sessions` row with 15-min expiry; inserts success row in `admin_access_log`. Returns `{ session_id, expires_at }`.
-  - On failure: logs failure; returns 401.
-- Edge function `admin-check`: returns whether caller has a non-expired admin session.
-- Frontend:
-  - Add "Admin" item in sidebar (visible to all; click handler does the role check + redirect).
-  - `AdminGuard` component wraps `/dashboard/admin/*`: calls `admin-check`; if not verified → redirect to `/dashboard/admin/verify`.
-  - `/dashboard/admin/verify` page: password (or TOTP) form → calls `admin-stepup`. On success → navigate to `/dashboard/admin`.
-  - `/dashboard/admin` placeholder admin dashboard (org member list, recent audit log entries, basic stats).
-  - On `signOut`, clear local admin session marker.
-- Security: server-side enforced role + verification check; verification expires automatically; all attempts logged.
+- New table `ai_message_usage`:
+  - `user_id uuid PK references auth.users(id)`, `count int default 0`, `window_start timestamptz default now()`, `updated_at`.
+  - RLS: user can select/update own row.
+- Edge function `ai-usage-check` (or inline in existing `finance-chat`):
+  - Before responding, fetch the user's row.
+  - If `now() - window_start >= 12h`, reset `count = 0, window_start = now()`.
+  - If `count >= FREE_LIMIT`, return 429 with `retry_after_seconds`.
+  - Else increment `count`.
+- `Chat.tsx`:
+  - Remove `localStorage` count.
+  - Read remaining count from a small RPC or from the function's response headers.
+  - Show "Limit reached — resets in Xh Ym".
+- Anonymous users: keep current localStorage preview behavior (cannot persist without a user). Confirm if you'd like anonymous users blocked entirely instead.
 
-## Technical notes
+## Open question before I start
 
-- Migrations: trigger function for expense→budget sync (SECURITY DEFINER, search_path=public), `admin_sessions`, `admin_access_log` with RLS.
-- Edge functions: deployed automatically; CORS headers; Zod validation on input.
-- New deps: `jspdf`, `jspdf-autotable`.
-- No auth method changes for normal login flow.
+For the contact form delivery (item 1), which do you prefer?
+- **A.** Lovable built-in transactional email (requires verifying a sender domain).
+- **B.** Resend connector.
+- **C.** Mailgun connector.
 
-## Out of scope
-
-- Building a full-featured admin panel beyond a basic dashboard with member list + audit log.
-- Manual avatar crop UI (request was "auto").
+Reply with A / B / C and I'll implement everything.
