@@ -216,9 +216,17 @@ const ResetPassword = () => {
                 </button>
               </form>
             ) : (
-              <Button variant="outline" className="w-full" onClick={() => navigate('/auth')}>
-                Back to sign in
-              </Button>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground text-center">
+                  This reset link is invalid or has expired. Request a new one to continue.
+                </p>
+                <Button className="w-full" onClick={() => navigate('/auth?mode=forgot')}>
+                  Request a new reset link
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => navigate('/auth')}>
+                  Back to sign in
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
