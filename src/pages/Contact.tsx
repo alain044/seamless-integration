@@ -159,10 +159,12 @@ export default function Contact() {
 
               <Button
                 type="submit"
+                disabled={sending}
                 className="w-full gradient-primary text-primary-foreground border-0 shadow-glow hover:scale-[1.02] transition-transform"
                 size="lg"
               >
-                <Send className="h-4 w-4 mr-2" /> Send Message
+                {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                {sending ? "Sending..." : "Send Message"}
               </Button>
             </motion.form>
           </div>
