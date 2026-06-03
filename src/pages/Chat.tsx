@@ -8,12 +8,20 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/finance-chat`;
-const FREE_LIMIT = 8;
+const ANON_FREE_LIMIT = 8;
 const COUNT_KEY = "savvy_free_msg_count";
+
+const formatReset = (ms: number) => {
+  if (ms <= 0) return "now";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 
 const SUGGESTIONS = [
   "How should I start investing with $1,000?",
@@ -30,7 +38,8 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<{ msg: string; retry: () => void } | null>(null);
-  const [freeCount, setFreeCount] = useState(() => Number(localStorage.getItem(COUNT_KEY) ?? "0"));
+  const [anonCount, setAnonCount] = useState(() => Number(localStorage.getItem(COUNT_KEY) ?? "0"));
+  const [dbUsage, setDbUsage] = useState<{ remaining: number; limit: number; reset_in_ms: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Context payload passed via location.state OR query params (dashboard CTA)
