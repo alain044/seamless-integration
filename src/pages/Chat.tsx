@@ -62,13 +62,27 @@ export default function Chat() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const remaining = user ? Infinity : Math.max(0, FREE_LIMIT - freeCount);
-  const limitReached = !user && remaining === 0;
+  // Load DB-backed usage for signed-in users
+  useEffect(() => {
+    if (!user) { setDbUsage(null); return; }
+    (async () => {
+      const { data } = await supabase.functions.invoke('ai-usage-check', { body: { action: 'check' } });
+      if (data) setDbUsage(data as any);
+    })();
+  }, [user]);
+
+  const remaining = user
+    ? (dbUsage ? dbUsage.remaining : Infinity)
+    : Math.max(0, ANON_FREE_LIMIT - anonCount);
+  const limit = user ? (dbUsage?.limit ?? null) : ANON_FREE_LIMIT;
+  const limitReached = remaining === 0;
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
     if (limitReached) {
-      toast.error("Sign in to keep chatting with Savvy.");
+      toast.error(user
+        ? `Daily limit reached. Resets in ${formatReset(dbUsage?.reset_in_ms ?? 0)}.`
+        : "Sign in to keep chatting with Savvy.");
       return;
     }
 
@@ -79,9 +93,19 @@ export default function Chat() {
     setIsLoading(true);
     setLastError(null);
 
-    if (!user) {
-      const next = freeCount + 1;
-      setFreeCount(next);
+    // Consume one credit
+    if (user) {
+      const { data, error } = await supabase.functions.invoke('ai-usage-check', { body: { action: 'consume' } });
+      if (error || (data && data.allowed === false)) {
+        setIsLoading(false);
+        setDbUsage(data as any);
+        toast.error(`Daily limit reached. Resets in ${formatReset((data as any)?.reset_in_ms ?? 0)}.`);
+        return;
+      }
+      setDbUsage(data as any);
+    } else {
+      const next = anonCount + 1;
+      setAnonCount(next);
       localStorage.setItem(COUNT_KEY, String(next));
     }
 
