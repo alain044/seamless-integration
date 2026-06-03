@@ -181,12 +181,16 @@ export default function Chat() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full pt-20 pb-4 px-4">
-        {!user && (
+        {!user ? (
           <div className="text-xs text-muted-foreground mb-2 text-center">
-            Free preview · {remaining === Infinity ? '∞' : remaining} of {FREE_LIMIT} messages remaining ·{' '}
-            <Link to="/auth" className="text-primary hover:underline">Sign in for unlimited</Link>
+            Free preview · {Math.max(0, ANON_FREE_LIMIT - anonCount)} of {ANON_FREE_LIMIT} messages remaining ·{' '}
+            <Link to="/auth" className="text-primary hover:underline">Sign in for more</Link>
           </div>
-        )}
+        ) : dbUsage ? (
+          <div className="text-xs text-muted-foreground mb-2 text-center">
+            {dbUsage.remaining} of {dbUsage.limit} messages remaining · resets in {formatReset(dbUsage.reset_in_ms)}
+          </div>
+        ) : null}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4">
           {messages.length === 0 && (
