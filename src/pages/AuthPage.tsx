@@ -219,7 +219,7 @@ const AuthPage = () => {
         await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
         toast.success('Recovery code accepted. Please re-enroll 2FA from Settings.');
         setLoading(false);
-        completeSignIn();
+        await completeSignIn();
         return;
       }
       const digits = mfaCode.replace(/\D/g, '');
@@ -229,7 +229,7 @@ const AuthPage = () => {
       const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: digits });
       if (vErr) throw vErr;
       setLoading(false);
-      completeSignIn();
+      await completeSignIn();
     } catch (err: any) {
       setLoading(false);
       toast.error(err.message);
@@ -265,7 +265,7 @@ const AuthPage = () => {
       }
       setLoading(false);
       clearGoogleFailures();
-      completeSignIn();
+      await completeSignIn();
     } catch (err: any) {
       setLoading(false);
       recordGoogleFailure();
