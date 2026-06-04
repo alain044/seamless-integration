@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -176,7 +176,7 @@ const AuthPage = () => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
+        options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/auth?verified=1` },
       });
       if (error) throw error;
       toast.success(t('auth.checkEmail'));

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Receipt, PiggyBank, Target, Sparkles,
   Briefcase, TrendingUp, BarChart3, Bell, ListChecks,
-  Settings, ChevronLeft, ChevronRight, LogOut, Building2, Activity, FileSpreadsheet, ShieldCheck
+  Settings, ChevronLeft, ChevronRight, LogOut, Building2, Activity, FileSpreadsheet, ShieldCheck, MessagesSquare, Headphones
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -59,6 +59,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const canSeeReports = role === 'owner' || role === 'accountant';
+  const isOwner = role === 'owner';
   const financeItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: '/dashboard/tasks', icon: ListChecks, label: t('nav.tasks') },
@@ -73,9 +74,11 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     { to: '/dashboard/market', icon: TrendingUp, label: t('nav.market') },
     { to: '/dashboard/analytics', icon: BarChart3, label: t('nav.analytics') },
     { to: '/dashboard/ai-insights', icon: Sparkles, label: t('nav.aiInsights') },
+    { to: '/dashboard/collaborate', icon: MessagesSquare, label: 'Collaborate' },
+    { to: '/dashboard/briefings', icon: Headphones, label: 'Briefings' },
     { to: '/dashboard/notifications', icon: Bell, label: t('nav.notifications') },
     { to: '/dashboard/status', icon: Activity, label: 'System Status' },
-    { to: '/dashboard/admin', icon: ShieldCheck, label: 'Admin' },
+    ...(isOwner ? [{ to: '/dashboard/admin', icon: ShieldCheck, label: 'Admin' }] : []),
     { to: '/dashboard/settings', icon: Settings, label: t('nav.settings') },
   ];
 
