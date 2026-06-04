@@ -41,6 +41,8 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AdminVerifyPage from "./pages/AdminVerifyPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import CollaboratePage from "./pages/CollaboratePage";
+import BriefingsPage from "./pages/BriefingsPage";
 import { AdminGuard } from "./components/admin/AdminGuard";
 import "./i18n";
 
@@ -141,6 +143,8 @@ const OrgGate = () => {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="status" element={<SystemStatus />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="collaborate" element={<CollaboratePage />} />
+        <Route path="briefings" element={<BriefingsPage />} />
         <Route path="admin/verify" element={<AdminVerifyPage />} />
         <Route path="admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
