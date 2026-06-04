@@ -19,7 +19,8 @@ interface Expense {
   type: 'expense' | 'income';
 }
 
-const categories = ['Food', 'Transport', 'Entertainment', 'Utilities', 'Health', 'Shopping', 'Income', 'Other'];
+import { EXPENSE_CATEGORIES } from '@/lib/expenseCategories';
+const categories = EXPENSE_CATEGORIES as readonly string[];
 
 const Expenses = () => {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ const Expenses = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newExpense, setNewExpense] = useState<{ name: string; category: string; amount: string; type: 'expense' | 'income' }>({ name: '', category: 'Food', amount: '', type: 'expense' });
+  const [newExpense, setNewExpense] = useState<{ name: string; category: string; amount: string; type: 'expense' | 'income' }>({ name: '', category: 'Food & Dining', amount: '', type: 'expense' });
 
   useEffect(() => {
     (async () => {
@@ -61,7 +62,7 @@ const Expenses = () => {
     const { data, error } = await supabase.from('expenses').insert(row).select().single();
     if (error) { toast.error(error.message); return; }
     setExpenses((prev) => [data as Expense, ...prev]);
-    setNewExpense({ name: '', category: 'Food', amount: '', type: 'expense' });
+    setNewExpense({ name: '', category: 'Food & Dining', amount: '', type: 'expense' });
     setDialogOpen(false);
   };
 

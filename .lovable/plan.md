@@ -1,52 +1,67 @@
-## 1. Contact form — deliver to hakizimanaalainpacifique@gmail.com
+## 1. Support email delivery + DB log
 
-- Keep the visible email `hello@savvyai.com` unchanged on `/contact`.
-- Update phone shown to `+250 798 254 398`.
-- Create edge function `send-contact-message` that:
-  - Validates name/email/message with Zod.
-  - Sends the email to `hakizimanaalainpacifique@gmail.com` (hard-coded recipient, with reply-to = submitter).
-- For delivery I'll use **Lovable's built-in transactional emails** (`scaffold_transactional_email`). This requires a verified sender domain. If you don't have one yet, I'll open the email-setup dialog so you can configure one quickly (DNS may take time to verify, but the queue stores messages and sends once verified).
-  - Alternative if you don't want to set up a domain: I can wire it to **Resend** or **Mailgun** via the standard connector instead. Tell me which you prefer.
-- `Contact.tsx` form `handleSubmit` will invoke the edge function and show success/error toasts.
+**Root cause:** sending from `onboarding@resend.dev` to a non-owner Gmail is silently dropped by Resend in many cases, and we have no record of the attempt.
 
-## 2. Login redirect loop
+**Fix:**
+- New table `support_messages` (name, email, phone, message, status, error, created_at) — RLS so only owners can read; anyone can insert via edge function (service role).
+- `send-contact-message` edge function:
+  - Insert row first with status `pending`.
+  - Send via Resend → on success update `sent`, on failure store `error` and return 502 but row is preserved.
+- Set up Lovable Emails domain (presented via setup dialog) so we can send from a verified sender to any inbox. Until DNS is verified, messages are still captured in DB.
+- Admin dashboard gets a "Support Inbox" panel listing all messages with status badges.
 
-- Audit the post-login flow. Current flow: `AuthPage` calls `navigate('/dashboard')`, `ProtectedDashboard` checks `user` then `email_confirmed_at`. The likely cause: after sign-in the auth listener fires `INITIAL_SESSION` then `SIGNED_IN`, but `navigate` runs before state propagates → guard sees `!user` once and bounces to `/auth`. Fix:
-  - In `AuthPage` signIn handler, await `supabase.auth.getSession()` after `signInWithPassword` succeeds, then `navigate('/dashboard', { replace: true })`.
-  - In `AuthRoute`, also gate on `loading` to avoid a flash redirect.
-  - Verify `localStorage` persistence is enabled (it is in `client.ts`).
-- Will repro and confirm fix via preview.
+## 2. Contact info — two phone numbers
 
-## 3. Password reset flow
+- Restore previous phone field; add `phone2` column on `profiles`.
+- Public Contact page shows both numbers (`+250 798 254 398` and the restored prior number — please confirm the exact second number in chat or I'll use a placeholder you can edit in Settings).
+- Settings page lets owner edit both.
 
-- `/reset-password` page already exists and uses `supabase.auth.updateUser({ password })`. I'll harden it:
-  - Confirm route is public (it is).
-  - Require an active recovery session before allowing submit (already checked).
-  - Add token-expiry handling: if `getSession()` returns null and URL has no `type=recovery`, show "Link expired — request a new one" with a button back to `/auth?mode=forgot`.
-  - Server-side, Supabase Auth hashes passwords (bcrypt) automatically — no extra work needed for hashing; will state this in the UI copy.
-  - Add password-strength enforcement (already partly done) and disallow reusing the current password by attempting `signInWithPassword` then surfacing message if same.
+## 3. Admin portal: owner-only + audio briefings
 
-## 4. Ask Savvy AI message limit → DB
+- Already owner-gated via `AdminGuard`; tighten by re-checking server-side in `admin-check` (already done) and removing any non-owner UI entrypoints.
+- New table `audio_briefings` (owner_id, org_id, title, audio_path, created_at) + `audio_briefing_recipients` (briefing_id, user_id, listened_at).
+- Storage bucket `briefings` (private) with RLS: owner uploads; recipients can read their own.
+- Admin page gets a "Briefings" tab:
+  - Record in-browser (MediaRecorder API) **and** file upload fallback.
+  - Pick recipients from org members (multi-select).
+- Recipients see a "Briefings" item in sidebar with playable list + unread badge.
 
-- New table `ai_message_usage`:
-  - `user_id uuid PK references auth.users(id)`, `count int default 0`, `window_start timestamptz default now()`, `updated_at`.
-  - RLS: user can select/update own row.
-- Edge function `ai-usage-check` (or inline in existing `finance-chat`):
-  - Before responding, fetch the user's row.
-  - If `now() - window_start >= 12h`, reset `count = 0, window_start = now()`.
-  - If `count >= FREE_LIMIT`, return 429 with `retry_after_seconds`.
-  - Else increment `count`.
-- `Chat.tsx`:
-  - Remove `localStorage` count.
-  - Read remaining count from a small RPC or from the function's response headers.
-  - Show "Limit reached — resets in Xh Ym".
-- Anonymous users: keep current localStorage preview behavior (cannot persist without a user). Confirm if you'd like anonymous users blocked entirely instead.
+## 4. Member collaboration workspace (realtime org chat)
 
-## Open question before I start
+- New table `org_messages` (org_id, user_id, body, created_at) with RLS limited to org members.
+- Enable realtime publication.
+- New page `/dashboard/collaborate` with channel list (one per org for now), message stream, composer.
+- Sidebar entry "Collaborate".
 
-For the contact form delivery (item 1), which do you prefer?
-- **A.** Lovable built-in transactional email (requires verifying a sender domain).
-- **B.** Resend connector.
-- **C.** Mailgun connector.
+## 5. Data persistence audit
 
-Reply with A / B / C and I'll implement everything.
+- Audit pages: Expenses, Budgets, Savings (already DB), Tasks, Portfolio/Holdings, Watchlist, Price alerts, Notifications, Settings — confirm all CRUD hits DB, no localStorage-only state for owned data.
+- Budget ↔ expenses sync already handled by `expenses_sync_budget` trigger; extend to savings goals when expense category = "Savings".
+
+## 6. Auth improvements
+
+- **Login 2FA via email code:**
+  - New table `login_otps` already exists (good). Edge function `login-otp-send` generates 6-digit code, stores hashed, emails via Resend.
+  - After password sign-in succeeds, sign user out temporarily, prompt for code, then re-sign-in via `verifyOtp` flow (or maintain a `verified_login_sessions` table and gate dashboard on it).
+  - Simplest secure path: use Supabase's built-in email OTP — call `signInWithOtp` after password as a second factor, verify, then allow dashboard. I'll implement this path.
+- **Post-verification redirect:** update `emailRedirectTo` to `/auth?verified=1`; AuthPage shows "Email verified — please log in" toast.
+
+## 7. Expense categories
+
+- Move from free-text to enum-backed dropdown. Predefined list (~30): Food & Dining, Groceries, Transport, Fuel, Utilities, Rent, Mortgage, Internet, Phone, Insurance, Healthcare, Education, Childcare, Entertainment, Subscriptions, Shopping, Clothing, Personal Care, Gifts, Donations, Travel, Hotels, Taxes, Fees, Savings, Investments, Business, Office, Software, Other.
+- Backward compatible: existing rows keep their text values; new entries pick from list (with "Other" + free text fallback).
+- Budgets page uses same list.
+
+## 8. Technical notes
+
+- All new tables get GRANTs + RLS + updated_at triggers.
+- New edge functions: `audio-briefing-notify`, `login-otp-send`, `login-otp-verify` (or use Supabase native OTP).
+- Use Lovable Cloud storage for audio.
+- Realtime via `supabase.channel`.
+
+## What I need from you
+
+1. **Second phone number** to restore (or I'll add it as empty for owner to fill).
+2. **Confirm email domain setup** — I'll show the dialog; without DNS, support messages are still captured in the database and visible in admin, but won't reach Gmail until verified.
+
+I'll proceed with everything else on approval.

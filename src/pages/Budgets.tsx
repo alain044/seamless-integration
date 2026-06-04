@@ -12,14 +12,15 @@ import { toast } from 'sonner';
 
 interface Budget { id: string; category: string; limit_amount: number; spent: number; }
 
-const categoriesList = ['Food', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Other'];
+import { EXPENSE_CATEGORIES } from '@/lib/expenseCategories';
+const categoriesList = EXPENSE_CATEGORIES.filter((c) => c !== 'Income') as readonly string[];
 
 const Budgets = () => {
   const { t } = useTranslation();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newBudget, setNewBudget] = useState({ category: 'Food', limit: '' });
+  const [newBudget, setNewBudget] = useState({ category: 'Food & Dining', limit: '' });
 
   useEffect(() => {
     (async () => {
@@ -45,7 +46,7 @@ const Budgets = () => {
     }).select().single();
     if (error) { toast.error(error.message); return; }
     setBudgets((prev) => [...prev, data as Budget]);
-    setNewBudget({ category: 'Food', limit: '' });
+    setNewBudget({ category: 'Food & Dining', limit: '' });
     setDialogOpen(false);
   };
 

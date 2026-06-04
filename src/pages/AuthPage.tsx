@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +39,16 @@ const AuthPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('login');
+  // Post-signup email-verified redirect: show toast + ensure they're on login.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('verified') === '1') {
+      toast.success('Email verified! Please sign in to continue.');
+      url.searchParams.delete('verified');
+      window.history.replaceState({}, '', url.toString());
+      setMode('login');
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -176,7 +186,7 @@ const AuthPage = () => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
+        options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/auth?verified=1` },
       });
       if (error) throw error;
       toast.success(t('auth.checkEmail'));

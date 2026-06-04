@@ -98,6 +98,79 @@ export type Database = {
         }
         Relationships: []
       }
+      audio_briefing_recipients: {
+        Row: {
+          briefing_id: string
+          created_at: string
+          id: string
+          listened_at: string | null
+          user_id: string
+        }
+        Insert: {
+          briefing_id: string
+          created_at?: string
+          id?: string
+          listened_at?: string | null
+          user_id: string
+        }
+        Update: {
+          briefing_id?: string
+          created_at?: string
+          id?: string
+          listened_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_briefing_recipients_briefing_id_fkey"
+            columns: ["briefing_id"]
+            isOneToOne: false
+            referencedRelation: "audio_briefings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audio_briefings: {
+        Row: {
+          audio_path: string
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          organization_id: string
+          owner_id: string
+          title: string
+        }
+        Insert: {
+          audio_path: string
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          organization_id: string
+          owner_id: string
+          title: string
+        }
+        Update: {
+          audio_path?: string
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          organization_id?: string
+          owner_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_briefings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category: string
@@ -342,6 +415,38 @@ export type Database = {
         }
         Relationships: []
       }
+      org_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_messages_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -470,6 +575,7 @@ export type Database = {
           full_name: string | null
           id: string
           phone: string | null
+          phone2: string | null
           updated_at: string
           user_id: string
         }
@@ -482,6 +588,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
+          phone2?: string | null
           updated_at?: string
           user_id: string
         }
@@ -494,6 +601,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
+          phone2?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -553,6 +661,39 @@ export type Database = {
           id?: string
           section?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          created_at: string
+          email: string
+          error: string | null
+          id: string
+          message: string
+          name: string
+          phone: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          error?: string | null
+          id?: string
+          message: string
+          name: string
+          phone?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          error?: string | null
+          id?: string
+          message?: string
+          name?: string
+          phone?: string | null
+          status?: string
         }
         Relationships: []
       }
