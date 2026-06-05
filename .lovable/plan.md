@@ -1,67 +1,70 @@
-## 1. Support email delivery + DB log
+# Implementation Plan
 
-**Root cause:** sending from `onboarding@resend.dev` to a non-owner Gmail is silently dropped by Resend in many cases, and we have no record of the attempt.
+This is a very large request. To ship it safely without breaking the existing app, I'll build it in **4 phases**, each independently testable. Confirm the phase order (or pick a subset) before I start.
 
-**Fix:**
-- New table `support_messages` (name, email, phone, message, status, error, created_at) — RLS so only owners can read; anyone can insert via edge function (service role).
-- `send-contact-message` edge function:
-  - Insert row first with status `pending`.
-  - Send via Resend → on success update `sent`, on failure store `error` and return 502 but row is preserved.
-- Set up Lovable Emails domain (presented via setup dialog) so we can send from a verified sender to any inbox. Until DNS is verified, messages are still captured in DB.
-- Admin dashboard gets a "Support Inbox" panel listing all messages with status badges.
+## Phase 1 — Foundations (data + access)
 
-## 2. Contact info — two phone numbers
+**Goal:** lock down admin, normalize categories everywhere, and add the schema the rest of the work depends on.
 
-- Restore previous phone field; add `phone2` column on `profiles`.
-- Public Contact page shows both numbers (`+250 798 254 398` and the restored prior number — please confirm the exact second number in chat or I'll use a placeholder you can edit in Settings).
-- Settings page lets owner edit both.
+- **Owner-only Admin enforcement**
+  - Already gated by `AdminGuard` + server-side `admin-check`. Add the exact "Unauthorized Access: You do not have permission to access administrative resources." copy. Audit sidebar/menus to make sure no admin link renders for non-owners.
+- **Category normalization service** (`src/lib/categoryNormalizer.ts`)
+  - Alias map → standardized `EXPENSE_CATEGORIES`. Applied in: manual expense entry, SmartScan import, budgets, reports, AI insights prompts.
+  - DB trigger `expenses_normalize_category` runs the same map server-side as a safety net.
+- **New tables**
+  - `recurring_expenses` (detected subscriptions)
+  - `goal_progress_history` (snapshot per update)
+  - `collab_cases`, `collab_case_messages`, `collab_case_attachments`, `collab_case_assignees` (cases workflow)
+  - `briefing_events` (assigned / received / first_play / last_play / completed timestamps + progress %)
+  - `integrity_reports` (output of persistence checks)
+- All new tables: GRANTs + RLS scoped to org membership / `auth.uid()`, `updated_at` triggers.
 
-## 3. Admin portal: owner-only + audio briefings
+## Phase 2 — SmartScan AI + AI Budgeting/Goals/Insights
 
-- Already owner-gated via `AdminGuard`; tighten by re-checking server-side in `admin-check` (already done) and removing any non-owner UI entrypoints.
-- New table `audio_briefings` (owner_id, org_id, title, audio_path, created_at) + `audio_briefing_recipients` (briefing_id, user_id, listened_at).
-- Storage bucket `briefings` (private) with RLS: owner uploads; recipients can read their own.
-- Admin page gets a "Briefings" tab:
-  - Record in-browser (MediaRecorder API) **and** file upload fallback.
-  - Pick recipients from org members (multi-select).
-- Recipients see a "Briefings" item in sidebar with playable list + unread badge.
+- **SmartScan AI**
+  - Storage bucket `receipts` (private, per-user folder).
+  - Edge function `smartscan-extract`: accepts uploaded file URL, calls Lovable AI (`google/gemini-2.5-pro` for PDFs/images — multimodal) to extract `{ date, merchant, amount, currency, category, line_items[], is_recurring }`, normalizes category, inserts into `expenses`, flags recurring into `recurring_expenses`.
+  - UI: new "Scan receipt" button on Expenses page → upload modal → preview extracted fields → save (editable).
+- **AI Budget recommendations**
+  - Edge function `ai-budget-suggest`: reads last 3 months of expenses, returns suggested monthly amount per category + rationale. UI button in Budgets.
+  - Overspend alerts via `notifications` insert when `spent/limit > 0.9` (trigger).
+- **AI Goals coach**
+  - Edge function `ai-goal-coach`: per goal, returns weekly required savings + tips.
+  - `goal_progress_history` rows on every update; chart on goal detail.
+- **AI Insights page upgrade**
+  - Single edge function `ai-insights` returns: spending analysis, forecast (next 30d), savings opportunities, cash-flow prediction, health score. Render as cards.
 
-## 4. Member collaboration workspace (realtime org chat)
+## Phase 3 — Voice Briefings v2 + Collaboration Center
 
-- New table `org_messages` (org_id, user_id, body, created_at) with RLS limited to org members.
-- Enable realtime publication.
-- New page `/dashboard/collaborate` with channel list (one per org for now), message stream, composer.
-- Sidebar entry "Collaborate".
+- **Voice Briefings**
+  - Extend `audio_briefing_recipients` with `first_played_at`, `last_played_at`, `completed_at`, `progress_seconds`.
+  - Recipient player: play / pause / resume / 15s skip / seek bar / replay; emits events to `briefing_events` + updates recipient row.
+  - Owner "Shared With" panel: per-briefing table of recipients with delivery / listening / completion badges.
+  - Notifications on assign / first play / completion (DB triggers → `notifications`).
+- **Collaboration Center (cases)**
+  - Replace simple chat with **cases** workflow: list, create, assign, mention (@user), threaded messages, attachments (bucket `collab-files`), status (`open`/`in_progress`/`pending_review`/`resolved`/`closed`), activity log.
+  - Realtime via `supabase.channel` on `collab_case_messages` and `collab_cases`.
+  - Existing `org_messages` chat kept as a "General" channel inside the Center.
 
-## 5. Data persistence audit
+## Phase 4 — Persistence & Sync verification
 
-- Audit pages: Expenses, Budgets, Savings (already DB), Tasks, Portfolio/Holdings, Watchlist, Price alerts, Notifications, Settings — confirm all CRUD hits DB, no localStorage-only state for owned data.
-- Budget ↔ expenses sync already handled by `expenses_sync_budget` trigger; extend to savings goals when expense category = "Savings".
+- Edge function `integrity-check` (cron-friendly) runs per-org checks:
+  - Expenses ↔ budgets `spent` rollup matches.
+  - Goal `saved` matches sum of `goal_progress_history`.
+  - Briefing recipients have consistent event timestamps.
+  - Support messages have no `pending` older than 1h.
+  - Logs results to `integrity_reports`.
+- Admin tab "Integrity" shows latest report + "Run now" button.
+- Persistence is already DB-backed (no localStorage for owned data); I'll audit and remove any stragglers found.
 
-## 6. Auth improvements
+## Dashboard
 
-- **Login 2FA via email code:**
-  - New table `login_otps` already exists (good). Edge function `login-otp-send` generates 6-digit code, stores hashed, emails via Resend.
-  - After password sign-in succeeds, sign user out temporarily, prompt for code, then re-sign-in via `verifyOtp` flow (or maintain a `verified_login_sessions` table and gate dashboard on it).
-  - Simplest secure path: use Supabase's built-in email OTP — call `signInWithOtp` after password as a second factor, verify, then allow dashboard. I'll implement this path.
-- **Post-verification redirect:** update `emailRedirectTo` to `/auth?verified=1`; AuthPage shows "Email verified — please log in" toast.
-
-## 7. Expense categories
-
-- Move from free-text to enum-backed dropdown. Predefined list (~30): Food & Dining, Groceries, Transport, Fuel, Utilities, Rent, Mortgage, Internet, Phone, Insurance, Healthcare, Education, Childcare, Entertainment, Subscriptions, Shopping, Clothing, Personal Care, Gifts, Donations, Travel, Hotels, Taxes, Fees, Savings, Investments, Business, Office, Software, Other.
-- Backward compatible: existing rows keep their text values; new entries pick from list (with "Other" + free text fallback).
-- Budgets page uses same list.
-
-## 8. Technical notes
-
-- All new tables get GRANTs + RLS + updated_at triggers.
-- New edge functions: `audio-briefing-notify`, `login-otp-send`, `login-otp-verify` (or use Supabase native OTP).
-- Use Lovable Cloud storage for audio.
-- Realtime via `supabase.channel`.
+The current dashboard already covers balance, income, expense, savings, charts, and recent transactions. I'll add **Budget utilization** strip (top 3 budgets with progress bars) and a **Cash flow** mini-chart (income vs expense, last 6 months) — non-breaking additions.
 
 ## What I need from you
 
-1. **Second phone number** to restore (or I'll add it as empty for owner to fill).
-2. **Confirm email domain setup** — I'll show the dialog; without DNS, support messages are still captured in the database and visible in admin, but won't reach Gmail until verified.
+1. **Phase order** — ship Phase 1 first (foundations), then 2 → 3 → 4? Or prioritize a specific phase (e.g., SmartScan first)?
+2. **SmartScan model** — default to `google/gemini-2.5-pro` (best multimodal for receipts). OK?
+3. **Collaboration cases** — replace the current org chat page with the cases workflow, or keep chat and add cases as a sibling tab?
 
-I'll proceed with everything else on approval.
+Reply with the order (or "go all phases in order") and I'll start.
