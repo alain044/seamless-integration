@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { UNAUTHORIZED_ADMIN_COPY } from './UnauthorizedAdmin';
 
 export const AdminGuard = ({ children }: { children: ReactNode }) => {
   const { organization, isOwner, loading: orgLoading } = useOrganization();
@@ -36,10 +37,8 @@ export const AdminGuard = ({ children }: { children: ReactNode }) => {
             <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
               <ShieldAlert className="w-6 h-6 text-destructive" />
             </div>
-            <CardTitle>Unauthorized</CardTitle>
-            <CardDescription>
-              The admin section is restricted to the organization owner.
-            </CardDescription>
+            <CardTitle>Unauthorized Access</CardTitle>
+            <CardDescription>{UNAUTHORIZED_ADMIN_COPY}</CardDescription>
           </CardHeader>
           <CardContent />
         </Card>
