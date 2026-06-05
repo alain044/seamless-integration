@@ -11,3 +11,13 @@ verify_jwt = false
 
 [functions.ai-usage-check]
 verify_jwt = false
+
+[functions.smartscan-extract]
+verify_jwt = true
+
+[functions.ai-budget-suggest]
+verify_jwt = true
+
+[functions.integrity-check]
+verify_jwt = true
+
