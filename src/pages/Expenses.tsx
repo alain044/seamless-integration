@@ -20,6 +20,8 @@ interface Expense {
 }
 
 import { EXPENSE_CATEGORIES } from '@/lib/expenseCategories';
+import { normalizeCategory } from '@/lib/categoryNormalizer';
+import { SmartScanDialog } from '@/components/expenses/SmartScanDialog';
 const categories = EXPENSE_CATEGORIES as readonly string[];
 
 const Expenses = () => {
@@ -54,7 +56,7 @@ const Expenses = () => {
     const row = {
       user_id: user.id,
       name: newExpense.name,
-      category: newExpense.category,
+      category: normalizeCategory(newExpense.category),
       amount: parseFloat(newExpense.amount),
       date: new Date().toISOString().slice(0, 10),
       type: newExpense.type,
@@ -73,12 +75,17 @@ const Expenses = () => {
           <h1 className="text-3xl font-bold text-foreground">{t('expenses.title')}</h1>
           <p className="text-muted-foreground mt-1">{t('expenses.subtitle')}</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={isViewer} title={isViewer ? 'Viewers cannot add expenses' : undefined}>
-              <Plus className="w-4 h-4 mr-2" />{t('expenses.addExpense')}
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          {!isViewer && <SmartScanDialog onImported={async () => {
+            const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+            setExpenses((data || []) as Expense[]);
+          }} />}
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={isViewer} title={isViewer ? 'Viewers cannot add expenses' : undefined}>
+                <Plus className="w-4 h-4 mr-2" />{t('expenses.addExpense')}
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{t('expenses.addExpense')}</DialogTitle></DialogHeader>
             <div className="space-y-4">
@@ -98,7 +105,8 @@ const Expenses = () => {
               <Button onClick={handleAdd} className="w-full">{t('expenses.add')}</Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <div className="flex gap-3">

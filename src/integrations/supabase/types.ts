@@ -101,23 +101,35 @@ export type Database = {
       audio_briefing_recipients: {
         Row: {
           briefing_id: string
+          completed_at: string | null
           created_at: string
+          first_played_at: string | null
           id: string
+          last_played_at: string | null
           listened_at: string | null
+          progress_seconds: number
           user_id: string
         }
         Insert: {
           briefing_id: string
+          completed_at?: string | null
           created_at?: string
+          first_played_at?: string | null
           id?: string
+          last_played_at?: string | null
           listened_at?: string | null
+          progress_seconds?: number
           user_id: string
         }
         Update: {
           briefing_id?: string
+          completed_at?: string | null
           created_at?: string
+          first_played_at?: string | null
           id?: string
+          last_played_at?: string | null
           listened_at?: string | null
+          progress_seconds?: number
           user_id?: string
         }
         Relationships: [
@@ -171,6 +183,41 @@ export type Database = {
           },
         ]
       }
+      briefing_events: {
+        Row: {
+          briefing_id: string
+          created_at: string
+          event_type: string
+          id: string
+          position_seconds: number | null
+          user_id: string
+        }
+        Insert: {
+          briefing_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          position_seconds?: number | null
+          user_id: string
+        }
+        Update: {
+          briefing_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          position_seconds?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "briefing_events_briefing_id_fkey"
+            columns: ["briefing_id"]
+            isOneToOne: false
+            referencedRelation: "audio_briefings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category: string
@@ -198,6 +245,103 @@ export type Database = {
           spent?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      collab_case_assignees: {
+        Row: {
+          assigned_at: string
+          case_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          case_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          case_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collab_case_assignees_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "collab_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collab_case_messages: {
+        Row: {
+          body: string
+          case_id: string
+          created_at: string
+          id: string
+          mentions: string[] | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          case_id: string
+          created_at?: string
+          id?: string
+          mentions?: string[] | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          case_id?: string
+          created_at?: string
+          id?: string
+          mentions?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collab_case_messages_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "collab_cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collab_cases: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          organization_id: string
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          organization_id: string
+          priority?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          organization_id?: string
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -236,6 +380,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      goal_progress_history: {
+        Row: {
+          created_at: string
+          goal_id: string
+          id: string
+          note: string | null
+          saved: number
+          target: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_id: string
+          id?: string
+          note?: string | null
+          saved: number
+          target: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal_id?: string
+          id?: string
+          note?: string | null
+          saved?: number
+          target?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_progress_history_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       holdings: {
         Row: {
@@ -286,6 +468,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      integrity_reports: {
+        Row: {
+          checks: Json
+          created_at: string
+          id: string
+          issues_count: number
+          organization_id: string
+          passed: boolean
+          run_by: string | null
+        }
+        Insert: {
+          checks: Json
+          created_at?: string
+          id?: string
+          issues_count?: number
+          organization_id: string
+          passed: boolean
+          run_by?: string | null
+        }
+        Update: {
+          checks?: Json
+          created_at?: string
+          id?: string
+          issues_count?: number
+          organization_id?: string
+          passed?: boolean
+          run_by?: string | null
+        }
+        Relationships: []
       }
       login_otps: {
         Row: {
@@ -602,6 +814,45 @@ export type Database = {
           id?: string
           phone?: string | null
           phone2?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recurring_expenses: {
+        Row: {
+          amount: number
+          cadence: string
+          category: string
+          created_at: string
+          id: string
+          last_seen: string
+          merchant: string
+          occurrences: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          cadence?: string
+          category: string
+          created_at?: string
+          id?: string
+          last_seen?: string
+          merchant: string
+          occurrences?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cadence?: string
+          category?: string
+          created_at?: string
+          id?: string
+          last_seen?: string
+          merchant?: string
+          occurrences?: number
           updated_at?: string
           user_id?: string
         }
