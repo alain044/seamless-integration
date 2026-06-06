@@ -300,6 +300,11 @@ const AIInsights = () => {
           }
         }
       }
+      if (assistant && user) {
+        await supabase.from('ai_insights_history').insert({
+          user_id: user.id, role: 'assistant', content: assistant,
+        });
+      }
     } catch (e) {
       toast.error(t('aiInsights.connectionError'));
     } finally {
