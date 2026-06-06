@@ -127,6 +127,22 @@ const AIInsights = () => {
     supabase.from('holdings').select('symbol,name,shares,avg_price,asset_type').then(({ data }) => {
       setPortfolio(data ?? []);
     });
+    // Load persisted chat history (most recent 50)
+    supabase
+      .from('ai_insights_history')
+      .select('role, content, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(50)
+      .then(({ data }) => {
+        if (data && data.length) {
+          setMessages(data.map((r: any) => ({
+            role: r.role === 'assistant' ? 'assistant' : 'user',
+            content: r.content,
+            display: r.role === 'user' ? r.content : undefined,
+          })));
+        }
+      });
   }, [user]);
 
   useEffect(() => {
