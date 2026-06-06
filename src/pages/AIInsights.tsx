@@ -31,8 +31,23 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const SUGGESTION_ICONS = [Wallet, TrendingUp, Brain, Sparkles];
 const SUGGESTION_KEYS = ['budget', 'diversification', 'strategy', 'risks'] as const;
 
-const readJson = <T,>(key: string, fallback: T): T => {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+// Build a finance snapshot directly from the database (no localStorage).
+const fetchFinanceSnapshot = async (userId: string) => {
+  const [{ data: exps }, { data: budgets }, { data: goals }] = await Promise.all([
+    supabase.from('expenses').select('amount, type, category, date, name').eq('user_id', userId).order('date', { ascending: false }).limit(50),
+    supabase.from('budgets').select('category, amount, spent').eq('user_id', userId),
+    supabase.from('savings_goals').select('name, target, saved').eq('user_id', userId),
+  ]);
+  const totalIncome = (exps || []).filter((e: any) => e.type === 'income').reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  const totalExpense = (exps || []).filter((e: any) => e.type === 'expense').reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  return {
+    monthly_income: totalIncome,
+    monthly_spending: totalExpense,
+    net_cashflow: totalIncome - totalExpense,
+    recent_transactions: (exps || []).slice(0, 10),
+    budgets: budgets || [],
+    savings_goals: goals || [],
+  };
 };
 
 const fileToDataUrl = (file: File) => new Promise<string>((res, rej) => {
@@ -112,27 +127,29 @@ const AIInsights = () => {
     supabase.from('holdings').select('symbol,name,shares,avg_price,asset_type').then(({ data }) => {
       setPortfolio(data ?? []);
     });
+    // Load persisted chat history (most recent 50)
+    supabase
+      .from('ai_insights_history')
+      .select('role, content, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(50)
+      .then(({ data }) => {
+        if (data && data.length) {
+          setMessages(data.map((r: any) => ({
+            role: r.role === 'assistant' ? 'assistant' : 'user',
+            content: r.content,
+            display: r.role === 'user' ? r.content : undefined,
+          })));
+        }
+      });
   }, [user]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  const buildFinanceSnapshot = () => {
-    const expenses = readJson<any[]>('savvy_expenses', []);
-    const budgets = readJson<any[]>('savvy_budgets', []);
-    const goals = readJson<any[]>('savvy_savings', []);
-    const totalIncome = expenses.filter(e => e.type === 'income').reduce((s, e) => s + Number(e.amount || 0), 0);
-    const totalExpense = expenses.filter(e => e.type === 'expense').reduce((s, e) => s + Number(e.amount || 0), 0);
-    return {
-      monthly_income: totalIncome,
-      monthly_spending: totalExpense,
-      net_cashflow: totalIncome - totalExpense,
-      recent_transactions: expenses.slice(-10),
-      budgets,
-      savings_goals: goals,
-    };
-  };
+  // Snapshot is fetched per-send from the database via fetchFinanceSnapshot(user.id).
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -225,10 +242,20 @@ const AIInsights = () => {
     setLoading(true);
 
     try {
+      // Persist user message
+      if (user) {
+        await supabase.from('ai_insights_history').insert({
+          user_id: user.id,
+          role: 'user',
+          content: displayText || combinedText.slice(0, 4000),
+          attachments: attachments.length ? attachments.map(a => ({ kind: a.kind, name: a.name })) : null,
+        });
+      }
+      const finance = user ? await fetchFinanceSnapshot(user.id) : {};
       const r = await fetch(`${SUPABASE_URL}/functions/v1/ai-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${ANON}` },
-        body: JSON.stringify({ messages: apiMessages, portfolio, finance: buildFinanceSnapshot() }),
+        body: JSON.stringify({ messages: apiMessages, portfolio, finance }),
       });
 
       if (!r.ok) {
@@ -272,6 +299,11 @@ const AIInsights = () => {
             break;
           }
         }
+      }
+      if (assistant && user) {
+        await supabase.from('ai_insights_history').insert({
+          user_id: user.id, role: 'assistant', content: assistant,
+        });
       }
     } catch (e) {
       toast.error(t('aiInsights.connectionError'));

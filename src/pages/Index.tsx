@@ -25,6 +25,7 @@ const Index = () => {
     savings: 0,
     savingsTarget: 0,
   });
+  const [topBudgets, setTopBudgets] = useState<{ category: string; amount: number; spent: number }[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -34,10 +35,11 @@ const Index = () => {
       startOfMonth.setHours(0, 0, 0, 0);
       const monthIso = startOfMonth.toISOString().slice(0, 10);
 
-      const [{ data: allExp }, { data: monthExp }, { data: goals }] = await Promise.all([
+      const [{ data: allExp }, { data: monthExp }, { data: goals }, { data: budgets }] = await Promise.all([
         supabase.from('expenses').select('amount, type').eq('user_id', user.id),
         supabase.from('expenses').select('amount, type').eq('user_id', user.id).gte('date', monthIso),
         supabase.from('savings_goals').select('saved, target').eq('user_id', user.id),
+        supabase.from('budgets').select('category, amount, spent').eq('user_id', user.id),
       ]);
 
       let balance = 0;
@@ -55,6 +57,12 @@ const Index = () => {
         savingsTarget += Number(g.target);
       });
       setStats({ balance, monthIncome, monthExpense, savings, savingsTarget });
+      const ranked = (budgets || [])
+        .map((b: any) => ({ category: b.category, amount: Number(b.amount), spent: Number(b.spent) }))
+        .filter(b => b.amount > 0)
+        .sort((a, b) => (b.spent / b.amount) - (a.spent / a.amount))
+        .slice(0, 4);
+      setTopBudgets(ranked);
     })();
   }, [user]);
 
@@ -95,6 +103,40 @@ const Index = () => {
           <FinanceStatCard key={i} {...stat} index={i} />
         ))}
       </div>
+
+      {topBudgets.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-card-foreground">Budget utilization</h2>
+            <a href="/dashboard/budgets" className="text-xs text-primary hover:underline">View all</a>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {topBudgets.map((b) => {
+              const pct = Math.min((b.spent / b.amount) * 100, 999);
+              const over = pct > 100;
+              const warn = pct >= 90 && !over;
+              const color = over ? 'bg-destructive' : warn ? 'bg-orange-500' : 'bg-primary';
+              return (
+                <div key={b.category}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-medium text-foreground truncate">{b.category}</span>
+                    <span className={over ? 'text-destructive font-semibold' : warn ? 'text-orange-500' : 'text-muted-foreground'}>
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {format(b.spent)} / {format(b.amount)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SpendingChart />
         <RecentTransactions />

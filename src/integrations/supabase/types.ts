@@ -77,6 +77,77 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_goal_recommendations: {
+        Row: {
+          created_at: string
+          goal_id: string | null
+          id: string
+          milestones: Json | null
+          raw_response: Json | null
+          strategy: string
+          tips: Json | null
+          user_id: string
+          weekly_savings: number | null
+        }
+        Insert: {
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          milestones?: Json | null
+          raw_response?: Json | null
+          strategy: string
+          tips?: Json | null
+          user_id: string
+          weekly_savings?: number | null
+        }
+        Update: {
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          milestones?: Json | null
+          raw_response?: Json | null
+          strategy?: string
+          tips?: Json | null
+          user_id?: string
+          weekly_savings?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_goal_recommendations_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_insights_history: {
+        Row: {
+          attachments: Json | null
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_message_usage: {
         Row: {
           count: number

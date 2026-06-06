@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface SavingsGoal { id: string; name: string; target: number; saved: number; icon: string; }
+interface GoalRec { id: string; goal_id: string; strategy: string; weekly_savings: number | null; milestones: any; tips: any; created_at: string; }
 
 const Savings = () => {
   const { t } = useTranslation();
@@ -16,15 +17,44 @@ const Savings = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({ name: '', target: '' });
+  const [recs, setRecs] = useState<Record<string, GoalRec>>({});
+  const [coaching, setCoaching] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.from('savings_goals').select('*').order('created_at', { ascending: true });
       if (error) toast.error(error.message);
       else setGoals((data || []) as SavingsGoal[]);
+      const { data: r } = await supabase
+        .from('ai_goal_recommendations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      const latest: Record<string, GoalRec> = {};
+      (r || []).forEach((row: any) => { if (row.goal_id && !latest[row.goal_id]) latest[row.goal_id] = row; });
+      setRecs(latest);
       setLoading(false);
     })();
   }, []);
+
+  const askCoach = async (goalId: string) => {
+    setCoaching(goalId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-goal-coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ goal_id: goalId }),
+      });
+      const json = await r.json();
+      if (!r.ok) { toast.error(json.error || 'Failed'); return; }
+      setRecs(prev => ({ ...prev, [goalId]: json.recommendation }));
+      toast.success('AI plan generated');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setCoaching(null);
+    }
+  };
 
   const totalSaved = goals.reduce((s, g) => s + Number(g.saved), 0);
   const totalTarget = goals.reduce((s, g) => s + Number(g.target), 0);
@@ -98,6 +128,25 @@ const Savings = () => {
                 <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
               <p className="text-xs text-muted-foreground mt-2">{pct.toFixed(0)}% {t('savings.saved')}</p>
+              <div className="mt-3 flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={() => askCoach(goal.id)} disabled={coaching === goal.id}>
+                  {coaching === goal.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  AI Goal Coach
+                </Button>
+                {recs[goal.id]?.weekly_savings != null && (
+                  <span className="text-xs text-muted-foreground">Save ${Number(recs[goal.id].weekly_savings).toFixed(0)}/wk</span>
+                )}
+              </div>
+              {recs[goal.id] && (
+                <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-2">
+                  <p className="text-foreground">{recs[goal.id].strategy}</p>
+                  {Array.isArray(recs[goal.id].tips) && recs[goal.id].tips.length > 0 && (
+                    <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                      {recs[goal.id].tips.slice(0, 3).map((tip: string, ti: number) => <li key={ti}>{tip}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
             </motion.div>
           );
         })}
