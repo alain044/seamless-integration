@@ -21,3 +21,9 @@ verify_jwt = true
 [functions.integrity-check]
 verify_jwt = true
 
+[functions.integrity-check-cron]
+verify_jwt = false
+
+[functions.ai-goal-coach]
+verify_jwt = true
+
