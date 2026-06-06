@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface SavingsGoal { id: string; name: string; target: number; saved: number; icon: string; }
+interface GoalRec { id: string; goal_id: string; strategy: string; weekly_savings: number | null; milestones: any; tips: any; created_at: string; }
 
 const Savings = () => {
   const { t } = useTranslation();
