@@ -17,15 +17,44 @@ const Savings = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({ name: '', target: '' });
+  const [recs, setRecs] = useState<Record<string, GoalRec>>({});
+  const [coaching, setCoaching] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.from('savings_goals').select('*').order('created_at', { ascending: true });
       if (error) toast.error(error.message);
       else setGoals((data || []) as SavingsGoal[]);
+      const { data: r } = await supabase
+        .from('ai_goal_recommendations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      const latest: Record<string, GoalRec> = {};
+      (r || []).forEach((row: any) => { if (row.goal_id && !latest[row.goal_id]) latest[row.goal_id] = row; });
+      setRecs(latest);
       setLoading(false);
     })();
   }, []);
+
+  const askCoach = async (goalId: string) => {
+    setCoaching(goalId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-goal-coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ goal_id: goalId }),
+      });
+      const json = await r.json();
+      if (!r.ok) { toast.error(json.error || 'Failed'); return; }
+      setRecs(prev => ({ ...prev, [goalId]: json.recommendation }));
+      toast.success('AI plan generated');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setCoaching(null);
+    }
+  };
 
   const totalSaved = goals.reduce((s, g) => s + Number(g.saved), 0);
   const totalTarget = goals.reduce((s, g) => s + Number(g.target), 0);
