@@ -25,6 +25,7 @@ const Index = () => {
     savings: 0,
     savingsTarget: 0,
   });
+  const [topBudgets, setTopBudgets] = useState<{ category: string; amount: number; spent: number }[]>([]);
 
   useEffect(() => {
     if (!user) return;
