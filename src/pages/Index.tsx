@@ -35,10 +35,11 @@ const Index = () => {
       startOfMonth.setHours(0, 0, 0, 0);
       const monthIso = startOfMonth.toISOString().slice(0, 10);
 
-      const [{ data: allExp }, { data: monthExp }, { data: goals }] = await Promise.all([
+      const [{ data: allExp }, { data: monthExp }, { data: goals }, { data: budgets }] = await Promise.all([
         supabase.from('expenses').select('amount, type').eq('user_id', user.id),
         supabase.from('expenses').select('amount, type').eq('user_id', user.id).gte('date', monthIso),
         supabase.from('savings_goals').select('saved, target').eq('user_id', user.id),
+        supabase.from('budgets').select('category, amount, spent').eq('user_id', user.id),
       ]);
 
       let balance = 0;
@@ -56,6 +57,12 @@ const Index = () => {
         savingsTarget += Number(g.target);
       });
       setStats({ balance, monthIncome, monthExpense, savings, savingsTarget });
+      const ranked = (budgets || [])
+        .map((b: any) => ({ category: b.category, amount: Number(b.amount), spent: Number(b.spent) }))
+        .filter(b => b.amount > 0)
+        .sort((a, b) => (b.spent / b.amount) - (a.spent / a.amount))
+        .slice(0, 4);
+      setTopBudgets(ranked);
     })();
   }, [user]);
 
