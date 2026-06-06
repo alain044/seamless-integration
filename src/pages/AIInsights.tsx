@@ -133,21 +133,7 @@ const AIInsights = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  const buildFinanceSnapshot = () => {
-    const expenses = readJson<any[]>('savvy_expenses', []);
-    const budgets = readJson<any[]>('savvy_budgets', []);
-    const goals = readJson<any[]>('savvy_savings', []);
-    const totalIncome = expenses.filter(e => e.type === 'income').reduce((s, e) => s + Number(e.amount || 0), 0);
-    const totalExpense = expenses.filter(e => e.type === 'expense').reduce((s, e) => s + Number(e.amount || 0), 0);
-    return {
-      monthly_income: totalIncome,
-      monthly_spending: totalExpense,
-      net_cashflow: totalIncome - totalExpense,
-      recent_transactions: expenses.slice(-10),
-      budgets,
-      savings_goals: goals,
-    };
-  };
+  // Snapshot is fetched per-send from the database via fetchFinanceSnapshot(user.id).
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
