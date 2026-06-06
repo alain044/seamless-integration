@@ -128,6 +128,25 @@ const Savings = () => {
                 <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
               </div>
               <p className="text-xs text-muted-foreground mt-2">{pct.toFixed(0)}% {t('savings.saved')}</p>
+              <div className="mt-3 flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={() => askCoach(goal.id)} disabled={coaching === goal.id}>
+                  {coaching === goal.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  AI Goal Coach
+                </Button>
+                {recs[goal.id]?.weekly_savings != null && (
+                  <span className="text-xs text-muted-foreground">Save ${Number(recs[goal.id].weekly_savings).toFixed(0)}/wk</span>
+                )}
+              </div>
+              {recs[goal.id] && (
+                <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-2">
+                  <p className="text-foreground">{recs[goal.id].strategy}</p>
+                  {Array.isArray(recs[goal.id].tips) && recs[goal.id].tips.length > 0 && (
+                    <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                      {recs[goal.id].tips.slice(0, 3).map((tip: string, ti: number) => <li key={ti}>{tip}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
             </motion.div>
           );
         })}
