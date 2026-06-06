@@ -31,8 +31,23 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const SUGGESTION_ICONS = [Wallet, TrendingUp, Brain, Sparkles];
 const SUGGESTION_KEYS = ['budget', 'diversification', 'strategy', 'risks'] as const;
 
-const readJson = <T,>(key: string, fallback: T): T => {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+// Build a finance snapshot directly from the database (no localStorage).
+const fetchFinanceSnapshot = async (userId: string) => {
+  const [{ data: exps }, { data: budgets }, { data: goals }] = await Promise.all([
+    supabase.from('expenses').select('amount, type, category, date, name').eq('user_id', userId).order('date', { ascending: false }).limit(50),
+    supabase.from('budgets').select('category, amount, spent').eq('user_id', userId),
+    supabase.from('savings_goals').select('name, target, saved').eq('user_id', userId),
+  ]);
+  const totalIncome = (exps || []).filter((e: any) => e.type === 'income').reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  const totalExpense = (exps || []).filter((e: any) => e.type === 'expense').reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+  return {
+    monthly_income: totalIncome,
+    monthly_spending: totalExpense,
+    net_cashflow: totalIncome - totalExpense,
+    recent_transactions: (exps || []).slice(0, 10),
+    budgets: budgets || [],
+    savings_goals: goals || [],
+  };
 };
 
 const fileToDataUrl = (file: File) => new Promise<string>((res, rej) => {
