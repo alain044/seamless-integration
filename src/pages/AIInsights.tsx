@@ -226,10 +226,20 @@ const AIInsights = () => {
     setLoading(true);
 
     try {
+      // Persist user message
+      if (user) {
+        await supabase.from('ai_insights_history').insert({
+          user_id: user.id,
+          role: 'user',
+          content: displayText || combinedText.slice(0, 4000),
+          attachments: attachments.length ? attachments.map(a => ({ kind: a.kind, name: a.name })) : null,
+        });
+      }
+      const finance = user ? await fetchFinanceSnapshot(user.id) : {};
       const r = await fetch(`${SUPABASE_URL}/functions/v1/ai-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${ANON}` },
-        body: JSON.stringify({ messages: apiMessages, portfolio, finance: buildFinanceSnapshot() }),
+        body: JSON.stringify({ messages: apiMessages, portfolio, finance }),
       });
 
       if (!r.ok) {
