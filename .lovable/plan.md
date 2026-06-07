@@ -1,70 +1,49 @@
-# Implementation Plan
+# Platform Upgrade — Scoping & Sequencing
 
-This is a very large request. To ship it safely without breaking the existing app, I'll build it in **4 phases**, each independently testable. Confirm the phase order (or pick a subset) before I start.
+This request bundles ~10 distinct modules. Much of it is already shipped (SmartScan, Briefings v2, Collaboration cases, Integrity, AI Budget, AI Goal Coach, Admin owner-only guard). I want to confirm priorities before another large multi-file change so we don't regress what's working.
 
-## Phase 1 — Foundations (data + access)
+## Status of each item
 
-**Goal:** lock down admin, normalize categories everywhere, and add the schema the rest of the work depends on.
+| # | Module | Current state | Gap to close |
+|---|---|---|---|
+| 1 | SmartScan AI | Done (`smartscan-extract`, `SmartScanDialog`) | **Add**: duplicate detection + `smartscan_imports` audit table |
+| 2 | 2FA | TOTP enrollment exists (`TwoFactorAuth.tsx`) — optional | **Mandatory enforcement** on every login (org policy + gate) |
+| 3 | Session/security logs | `admin_access_log`, `settings_audit_log` exist | Add `security_events` (login, logout, failed login, pwd change, device) |
+| 4 | Owner-only admin routes | Done (`AdminGuard` + `admin-check`) | Add explicit unauthorized-attempt log row |
+| 5 | Audio Briefings | Done v2 (player, events, shared-with) | Verify; no new work unless gaps found |
+| 6 | Collaboration Center | Cases done; org chat exists | Add @mentions parsing + mention notifications + search |
+| 7 | Profile picture upload | `avatars` bucket exists | Debug failure, add validation, instant refresh |
+| 8 | Contact form email | `send-contact-message` + DB log exists | Verify Resend delivery, add failure logging |
+| 9 | Budget merge on duplicate | Currently allows duplicates | Upsert/merge by (user_id, category): sum limits |
+| 10 | Ask Savvy greetings + finance-only | `finance-chat` exists | Update system prompt for greetings + topic guardrails |
+| 11 | Admin financial CRUD | Owner-only today | Add `admin` role permission to expenses/budgets/goals via RLS using `has_role` |
 
-- **Owner-only Admin enforcement**
-  - Already gated by `AdminGuard` + server-side `admin-check`. Add the exact "Unauthorized Access: You do not have permission to access administrative resources." copy. Audit sidebar/menus to make sure no admin link renders for non-owners.
-- **Category normalization service** (`src/lib/categoryNormalizer.ts`)
-  - Alias map → standardized `EXPENSE_CATEGORIES`. Applied in: manual expense entry, SmartScan import, budgets, reports, AI insights prompts.
-  - DB trigger `expenses_normalize_category` runs the same map server-side as a safety net.
-- **New tables**
-  - `recurring_expenses` (detected subscriptions)
-  - `goal_progress_history` (snapshot per update)
-  - `collab_cases`, `collab_case_messages`, `collab_case_attachments`, `collab_case_assignees` (cases workflow)
-  - `briefing_events` (assigned / received / first_play / last_play / completed timestamps + progress %)
-  - `integrity_reports` (output of persistence checks)
-- All new tables: GRANTs + RLS scoped to org membership / `auth.uid()`, `updated_at` triggers.
+## Proposed sequence (one phase per turn)
 
-## Phase 2 — SmartScan AI + AI Budgeting/Goals/Insights
+**Phase A — Data & policy (one migration)**
+- `smartscan_imports` (audit) + dedupe index on `expenses (user_id, date, amount, name)`
+- `security_events` table + GRANTs + RLS
+- `org_security_policy` table (mfa_required boolean) — owners toggle
+- Update RLS on `expenses`, `budgets`, `savings_goals`: allow org `admin` role full CRUD via `has_role`
+- Unique-ish enforcement helper for budgets: merge logic in app + a UNIQUE `(user_id, category)` partial index after dedupe
 
-- **SmartScan AI**
-  - Storage bucket `receipts` (private, per-user folder).
-  - Edge function `smartscan-extract`: accepts uploaded file URL, calls Lovable AI (`google/gemini-2.5-pro` for PDFs/images — multimodal) to extract `{ date, merchant, amount, currency, category, line_items[], is_recurring }`, normalizes category, inserts into `expenses`, flags recurring into `recurring_expenses`.
-  - UI: new "Scan receipt" button on Expenses page → upload modal → preview extracted fields → save (editable).
-- **AI Budget recommendations**
-  - Edge function `ai-budget-suggest`: reads last 3 months of expenses, returns suggested monthly amount per category + rationale. UI button in Budgets.
-  - Overspend alerts via `notifications` insert when `spent/limit > 0.9` (trigger).
-- **AI Goals coach**
-  - Edge function `ai-goal-coach`: per goal, returns weekly required savings + tips.
-  - `goal_progress_history` rows on every update; chart on goal detail.
-- **AI Insights page upgrade**
-  - Single edge function `ai-insights` returns: spending analysis, forecast (next 30d), savings opportunities, cash-flow prediction, health score. Render as cards.
+**Phase B — Auth & security**
+- 2FA enforcement gate in `AuthPage` / route guard: if org policy requires MFA and user has no verified factor → force enrollment screen before app access
+- Login/logout/failed-login hooks → write to `security_events`
+- Unauthorized admin attempt → insert into `security_events` from `AdminGuard`
 
-## Phase 3 — Voice Briefings v2 + Collaboration Center
+**Phase C — Feature polish**
+- SmartScan: pre-insert dedupe check + write to `smartscan_imports`
+- Budgets: merge-on-duplicate (sum limit, re-sync spent)
+- Ask Savvy: prompt update (greetings + finance-only)
+- Contact form: surface delivery errors + persist failures
+- Profile avatar: fix upload (mime/size validation, public URL refresh)
+- Collaboration: @mention extraction → notifications, message search box
 
-- **Voice Briefings**
-  - Extend `audio_briefing_recipients` with `first_played_at`, `last_played_at`, `completed_at`, `progress_seconds`.
-  - Recipient player: play / pause / resume / 15s skip / seek bar / replay; emits events to `briefing_events` + updates recipient row.
-  - Owner "Shared With" panel: per-briefing table of recipients with delivery / listening / completion badges.
-  - Notifications on assign / first play / completion (DB triggers → `notifications`).
-- **Collaboration Center (cases)**
-  - Replace simple chat with **cases** workflow: list, create, assign, mention (@user), threaded messages, attachments (bucket `collab-files`), status (`open`/`in_progress`/`pending_review`/`resolved`/`closed`), activity log.
-  - Realtime via `supabase.channel` on `collab_case_messages` and `collab_cases`.
-  - Existing `org_messages` chat kept as a "General" channel inside the Center.
+## Questions before I start
 
-## Phase 4 — Persistence & Sync verification
+1. **MFA enforcement scope** — make it mandatory **globally for every user** (your wording), or **per-org toggle** owners control? Global is simpler but locks out existing users immediately on next login.
+2. **Admin financial CRUD** — should org `admin`s edit **any member's** expenses/budgets/goals, or only their own + org-shared records? (Today everything is per-user.)
+3. **Phase order** — start with Phase A (migration) now, or do you want a specific module first (e.g., fix avatar upload + contact form first since those are bugs)?
 
-- Edge function `integrity-check` (cron-friendly) runs per-org checks:
-  - Expenses ↔ budgets `spent` rollup matches.
-  - Goal `saved` matches sum of `goal_progress_history`.
-  - Briefing recipients have consistent event timestamps.
-  - Support messages have no `pending` older than 1h.
-  - Logs results to `integrity_reports`.
-- Admin tab "Integrity" shows latest report + "Run now" button.
-- Persistence is already DB-backed (no localStorage for owned data); I'll audit and remove any stragglers found.
-
-## Dashboard
-
-The current dashboard already covers balance, income, expense, savings, charts, and recent transactions. I'll add **Budget utilization** strip (top 3 budgets with progress bars) and a **Cash flow** mini-chart (income vs expense, last 6 months) — non-breaking additions.
-
-## What I need from you
-
-1. **Phase order** — ship Phase 1 first (foundations), then 2 → 3 → 4? Or prioritize a specific phase (e.g., SmartScan first)?
-2. **SmartScan model** — default to `google/gemini-2.5-pro` (best multimodal for receipts). OK?
-3. **Collaboration cases** — replace the current org chat page with the cases workflow, or keep chat and add cases as a sibling tab?
-
-Reply with the order (or "go all phases in order") and I'll start.
+Pick answers and I'll execute phase by phase.
