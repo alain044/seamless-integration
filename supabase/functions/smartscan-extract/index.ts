@@ -138,7 +138,27 @@ Deno.serve(async (req) => {
       inserted = data ?? [];
     }
 
-  } catch (e: any) {
+    // Recurring detection on fresh rows only
+    const recurring = txns.filter((t) => t.is_recurring && Math.abs(Number(t.amount) || 0) > 0);
+    if (recurring.length && fresh.length) {
+      const rrows = recurring.map((t) => ({
+        user_id: user.id,
+        merchant: t.merchant || "Unknown",
+        category: STANDARD_CATEGORIES.includes(t.category) ? t.category : "Other",
+        amount: Math.abs(Number(t.amount) || 0),
+        cadence: "monthly",
+      }));
+      await admin.from("recurring_expenses").insert(rrows);
+    }
+
+    if (audit) await admin.from("smartscan_imports").update({
+      status: "completed",
+      inserted_count: inserted.length,
+      duplicate_count: duplicates,
+    }).eq("id", audit.id);
+
+    return json({ inserted: inserted.length, duplicates, transactions: inserted });
+
     console.error("smartscan error", e);
     return json({ error: e.message || "Unknown error" }, 500);
   }
