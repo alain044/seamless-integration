@@ -2,18 +2,29 @@ import { useEffect, useState, ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UNAUTHORIZED_ADMIN_COPY } from './UnauthorizedAdmin';
+import { logSecurityEvent } from '@/lib/securityLog';
 
 export const AdminGuard = ({ children }: { children: ReactNode }) => {
   const { organization, isOwner, loading: orgLoading } = useOrganization();
+  const { user } = useAuth();
   const location = useLocation();
   const [state, setState] = useState<'checking' | 'verified' | 'unverified' | 'denied'>('checking');
 
   useEffect(() => {
     if (orgLoading || !organization) return;
-    if (!isOwner) { setState('denied'); return; }
+    if (!isOwner) {
+      setState('denied');
+      logSecurityEvent('unauthorized_admin', {
+        user_id: user?.id ?? null,
+        route: location.pathname,
+        metadata: { organization_id: organization.id, reason: 'non_owner' },
+      });
+      return;
+    }
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
@@ -23,7 +34,7 @@ export const AdminGuard = ({ children }: { children: ReactNode }) => {
       const json = await res.json();
       setState(json.verified ? 'verified' : 'unverified');
     })();
-  }, [organization, isOwner, orgLoading, location.pathname]);
+  }, [organization, isOwner, orgLoading, location.pathname, user?.id]);
 
   if (orgLoading || state === 'checking') {
     return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin" /></div>;
