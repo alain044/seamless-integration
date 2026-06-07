@@ -20,7 +20,7 @@ export async function logSecurityEvent(
       event_type,
       route: opts.route ?? (typeof window !== 'undefined' ? window.location.pathname : null),
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 500) : null,
-      metadata: opts.metadata ?? {},
+      metadata: (opts.metadata ?? {}) as any,
     });
   } catch (e) {
     // Logging must never block flow
