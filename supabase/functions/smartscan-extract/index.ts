@@ -86,7 +86,17 @@ Deno.serve(async (req) => {
     const txns: any[] = Array.isArray(parsed.transactions) ? parsed.transactions : [];
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const rows = txns.map((t) => ({
+
+    // Open audit row first
+    const { data: audit } = await admin.from("smartscan_imports").insert({
+      user_id: user.id,
+      file_name: fileName ?? null,
+      status: "processing",
+      extracted_count: txns.length,
+      raw: parsed,
+    }).select("id").single();
+
+    const candidateRows = txns.map((t) => ({
       user_id: user.id,
       name: t.merchant || t.description || "SmartScan",
       category: STANDARD_CATEGORIES.includes(t.category) ? t.category : "Other",
@@ -95,14 +105,42 @@ Deno.serve(async (req) => {
       type: t.type === "income" ? "income" : "expense",
     })).filter((r) => r.amount > 0);
 
-    if (rows.length === 0) return json({ inserted: 0, transactions: [] });
+    if (candidateRows.length === 0) {
+      if (audit) await admin.from("smartscan_imports").update({ status: "empty" }).eq("id", audit.id);
+      return json({ inserted: 0, duplicates: 0, transactions: [] });
+    }
 
-    const { data: inserted, error } = await admin.from("expenses").insert(rows).select();
-    if (error) return json({ error: error.message }, 500);
+    // Duplicate detection — look for existing expense matching user/date/amount/name
+    const dateList = Array.from(new Set(candidateRows.map((r) => r.date)));
+    const { data: existing } = await admin.from("expenses")
+      .select("user_id, name, amount, date")
+      .eq("user_id", user.id)
+      .in("date", dateList);
+    const seen = new Set(
+      (existing || []).map((e: any) => `${e.date}|${Number(e.amount).toFixed(2)}|${(e.name || "").toLowerCase().trim()}`),
+    );
+    const fresh: typeof candidateRows = [];
+    let duplicates = 0;
+    for (const r of candidateRows) {
+      const key = `${r.date}|${Number(r.amount).toFixed(2)}|${r.name.toLowerCase().trim()}`;
+      if (seen.has(key)) { duplicates++; continue; }
+      seen.add(key);
+      fresh.push(r);
+    }
 
-    // Recurring detection
-    const recurring = txns.filter((t) => t.is_recurring);
-    if (recurring.length) {
+    let inserted: any[] = [];
+    if (fresh.length) {
+      const { data, error } = await admin.from("expenses").insert(fresh).select();
+      if (error) {
+        if (audit) await admin.from("smartscan_imports").update({ status: "failed", error: error.message, duplicate_count: duplicates }).eq("id", audit.id);
+        return json({ error: error.message }, 500);
+      }
+      inserted = data ?? [];
+    }
+
+    // Recurring detection on fresh rows only
+    const recurring = txns.filter((t) => t.is_recurring && Math.abs(Number(t.amount) || 0) > 0);
+    if (recurring.length && fresh.length) {
       const rrows = recurring.map((t) => ({
         user_id: user.id,
         merchant: t.merchant || "Unknown",
@@ -113,7 +151,13 @@ Deno.serve(async (req) => {
       await admin.from("recurring_expenses").insert(rrows);
     }
 
-    return json({ inserted: inserted?.length ?? 0, transactions: inserted });
+    if (audit) await admin.from("smartscan_imports").update({
+      status: "completed",
+      inserted_count: inserted.length,
+      duplicate_count: duplicates,
+    }).eq("id", audit.id);
+
+    return json({ inserted: inserted.length, duplicates, transactions: inserted });
   } catch (e: any) {
     console.error("smartscan error", e);
     return json({ error: e.message || "Unknown error" }, 500);

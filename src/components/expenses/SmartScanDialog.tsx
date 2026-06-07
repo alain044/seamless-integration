@@ -57,7 +57,9 @@ export const SmartScanDialog = ({ onImported }: { onImported?: () => void }) => 
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'SmartScan failed');
-      toast.success(`Imported ${json.inserted} transaction${json.inserted === 1 ? '' : 's'}`);
+      const msg = `Imported ${json.inserted} transaction${json.inserted === 1 ? '' : 's'}` +
+        (json.duplicates ? ` · skipped ${json.duplicates} duplicate${json.duplicates === 1 ? '' : 's'}` : '');
+      toast.success(msg);
       setOpen(false);
       onImported?.();
     } catch (e: any) {
