@@ -962,6 +962,39 @@ export type Database = {
         }
         Relationships: []
       }
+      security_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          ip: string | null
+          metadata: Json
+          route: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          route?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          route?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       settings_audit_log: {
         Row: {
           changes: Json
@@ -982,6 +1015,45 @@ export type Database = {
           created_at?: string
           id?: string
           section?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      smartscan_imports: {
+        Row: {
+          created_at: string
+          duplicate_count: number
+          error: string | null
+          extracted_count: number
+          file_name: string | null
+          id: string
+          inserted_count: number
+          raw: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duplicate_count?: number
+          error?: string | null
+          extracted_count?: number
+          file_name?: string | null
+          id?: string
+          inserted_count?: number
+          raw?: Json | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duplicate_count?: number
+          error?: string | null
+          extracted_count?: number
+          file_name?: string | null
+          id?: string
+          inserted_count?: number
+          raw?: Json | null
+          status?: string
           user_id?: string
         }
         Relationships: []
@@ -1168,6 +1240,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_user_finance: { Args: { _target: string }; Returns: boolean }
       find_org_by_code: {
         Args: { _code: string }
         Returns: {
