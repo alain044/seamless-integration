@@ -41,14 +41,24 @@ const Budgets = () => {
     if (!newBudget.limit) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error('Sign in required'); return; }
-    const { data, error } = await supabase.from('budgets').insert({
-      user_id: user.id,
-      category: normalizeCategory(newBudget.category),
-      limit_amount: parseFloat(newBudget.limit),
-      spent: 0,
-    }).select().single();
-    if (error) { toast.error(error.message); return; }
-    setBudgets((prev) => [...prev, data as Budget]);
+    const cat = normalizeCategory(newBudget.category);
+    const limit = parseFloat(newBudget.limit);
+    const existing = budgets.find((b) => b.category === cat);
+    if (existing) {
+      // Merge: sum the limit into existing budget
+      const newLimit = Number(existing.limit_amount) + limit;
+      const { data, error } = await supabase.from('budgets')
+        .update({ limit_amount: newLimit }).eq('id', existing.id).select().single();
+      if (error) { toast.error(error.message); return; }
+      setBudgets((prev) => prev.map((b) => b.id === existing.id ? (data as Budget) : b));
+      toast.success(`Merged into existing "${cat}" budget`);
+    } else {
+      const { data, error } = await supabase.from('budgets').insert({
+        user_id: user.id, category: cat, limit_amount: limit, spent: 0,
+      }).select().single();
+      if (error) { toast.error(error.message); return; }
+      setBudgets((prev) => [...prev, data as Budget]);
+    }
     setNewBudget({ category: 'Food & Dining', limit: '' });
     setDialogOpen(false);
   };

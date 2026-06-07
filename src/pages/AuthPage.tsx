@@ -133,8 +133,12 @@ const AuthPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const { logSecurityEvent } = await import('@/lib/securityLog');
+        logSecurityEvent('login_failed', { metadata: { email, reason: error.message } });
+        throw error;
+      }
 
       // Check TOTP first (stronger).
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -163,9 +167,15 @@ const AuthPage = () => {
     const token = otpCode.replace(/\D/g, '');
     if (token.length !== 6) { toast.error('Enter the 6-digit code'); return; }
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      const { logSecurityEvent } = await import('@/lib/securityLog');
+      logSecurityEvent('mfa_failed', { metadata: { email, method: 'email_otp' } });
+      toast.error(error.message); return;
+    }
+    const { logSecurityEvent } = await import('@/lib/securityLog');
+    logSecurityEvent('login_success', { user_id: data?.user?.id, metadata: { method: 'email_otp' } });
     await completeSignIn();
   };
 
@@ -215,6 +225,7 @@ const AuthPage = () => {
     if (!mfaFactorId) return;
     setLoading(true);
     try {
+      const { logSecurityEvent } = await import('@/lib/securityLog');
       if (useRecovery) {
         const normalized = mfaCode.trim().toUpperCase().replace(/\s/g, '');
         if (!normalized) throw new Error('Enter a recovery code');
@@ -224,9 +235,10 @@ const AuthPage = () => {
         const { data: row } = await supabase
           .from('mfa_recovery_codes').select('id')
           .eq('user_id', user.id).eq('code_hash', hash).is('used_at', null).maybeSingle();
-        if (!row) throw new Error('Invalid or already used recovery code');
+        if (!row) { logSecurityEvent('mfa_failed', { user_id: user.id, metadata: { method: 'recovery' } }); throw new Error('Invalid or already used recovery code'); }
         await supabase.from('mfa_recovery_codes').update({ used_at: new Date().toISOString() }).eq('id', row.id);
         await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+        logSecurityEvent('login_success', { user_id: user.id, metadata: { method: 'recovery' } });
         toast.success('Recovery code accepted. Please re-enroll 2FA from Settings.');
         setLoading(false);
         await completeSignIn();
@@ -237,7 +249,14 @@ const AuthPage = () => {
       const { data: challenge, error: cErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
       if (cErr || !challenge) throw cErr || new Error('Challenge failed');
       const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: digits });
-      if (vErr) throw vErr;
+      if (vErr) {
+        const { data: { user } } = await supabase.auth.getUser();
+        logSecurityEvent('mfa_failed', { user_id: user?.id, metadata: { method: 'totp' } });
+        throw vErr;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      logSecurityEvent('mfa_verified', { user_id: user?.id, metadata: { method: 'totp' } });
+      logSecurityEvent('login_success', { user_id: user?.id, metadata: { method: 'totp' } });
       setLoading(false);
       await completeSignIn();
     } catch (err: any) {
