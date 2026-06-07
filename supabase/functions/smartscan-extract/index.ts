@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     }).eq("id", audit.id);
 
     return json({ inserted: inserted.length, duplicates, transactions: inserted });
-
+  } catch (e: any) {
     console.error("smartscan error", e);
     return json({ error: e.message || "Unknown error" }, 500);
   }
