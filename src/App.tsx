@@ -150,8 +150,9 @@ const OrgGate = () => {
         <Route path="admin/verify" element={<AdminVerifyPage />} />
         <Route path="admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+        </Routes>
+      </AppLayout>
+    </MfaGate>
   );
 };
 
