@@ -173,8 +173,14 @@ const CasesTab = () => {
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-1 pt-0">
-          {cases.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No cases yet.</p>}
-          {cases.map((c) => (
+          <Input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search discussions…" className="mb-2 h-8 text-xs" />
+          {filteredCases.length === 0 && (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              {search ? 'No matches.' : 'No cases yet.'}
+            </p>
+          )}
+          {filteredCases.map((c) => (
             <button key={c.id} onClick={() => setActive(c)}
               className={`w-full text-left p-2 rounded border ${active?.id === c.id ? 'border-primary bg-accent' : 'border-border hover:bg-accent/50'}`}>
               <p className="text-sm font-medium truncate">{c.title}</p>
