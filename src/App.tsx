@@ -10,6 +10,7 @@ import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationCo
 import { PreferencesProvider } from "@/contexts/PreferencesContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { AskSavvyButton } from "@/components/AskSavvyButton";
+import { MfaGate } from "@/components/MfaGate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MailCheck, LogOut, RefreshCw } from "lucide-react";
@@ -126,8 +127,9 @@ const OrgGate = () => {
   if (!organization) return <OnboardingOrg />;
 
   return (
-    <AppLayout>
-      <Routes>
+    <MfaGate>
+      <AppLayout>
+        <Routes>
         <Route path="/" element={<Index />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="budgets" element={<Budgets />} />
@@ -148,8 +150,9 @@ const OrgGate = () => {
         <Route path="admin/verify" element={<AdminVerifyPage />} />
         <Route path="admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </AppLayout>
+        </Routes>
+      </AppLayout>
+    </MfaGate>
   );
 };
 

@@ -22,7 +22,7 @@ const STATUS_VARIANT: Record<Status, 'default' | 'secondary' | 'destructive' | '
 };
 
 interface Case { id: string; title: string; description: string | null; status: Status; priority: string; created_by: string; created_at: string; }
-interface Msg { id: string; case_id: string; user_id: string; body: string; created_at: string; }
+interface Msg { id: string; case_id: string; user_id: string; body: string; created_at: string; parent_message_id?: string | null; mentions?: string[] }
 interface ChatMsg { id: string; user_id: string; body: string; created_at: string; }
 
 const CasesTab = () => {
@@ -35,6 +35,23 @@ const CasesTab = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reply, setReply] = useState('');
   const [profiles, setProfiles] = useState<Record<string, { full_name: string | null; email: string | null }>>({});
+  const [search, setSearch] = useState('');
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const [members, setMembers] = useState<Array<{ user_id: string; full_name: string | null; email: string | null }>>([]);
+
+  useEffect(() => {
+    if (!organization) return;
+    (async () => {
+      const { data: mems } = await supabase.from('organization_members')
+        .select('user_id').eq('organization_id', organization.id);
+      const ids = (mems || []).map((m: any) => m.user_id);
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles')
+          .select('user_id, full_name, email').in('user_id', ids);
+        setMembers((profs || []) as any);
+      }
+    })();
+  }, [organization?.id]);
 
   const loadProfiles = async (ids: string[]) => {
     const missing = ids.filter((id) => !profiles[id]);
@@ -105,10 +122,27 @@ const CasesTab = () => {
     e.preventDefault();
     if (!user || !active || !reply.trim()) return;
     const body = reply.trim();
-    setReply('');
-    const { error } = await supabase.from('collab_case_messages').insert({ case_id: active.id, user_id: user.id, body });
+    // Extract @mentions: match @name to a member's full_name or email
+    const mentionMatches = Array.from(body.matchAll(/@([\w.@-]+)/g)).map((m) => m[1].toLowerCase());
+    const mentionIds = members
+      .filter((m) => {
+        const hay = `${m.full_name ?? ''} ${m.email ?? ''}`.toLowerCase();
+        return mentionMatches.some((q) => hay.includes(q));
+      })
+      .map((m) => m.user_id);
+    setReply(''); const parent = replyTo?.id ?? null; setReplyTo(null);
+    const { error } = await supabase.from('collab_case_messages').insert({
+      case_id: active.id, user_id: user.id, body,
+      mentions: mentionIds, parent_message_id: parent,
+    } as any);
     if (error) toast.error(error.message);
   };
+
+  const filteredCases = cases.filter((c) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return c.title.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q);
+  });
 
   const label = (uid: string) => profiles[uid]?.full_name || profiles[uid]?.email || uid.slice(0, 8);
 
@@ -139,8 +173,14 @@ const CasesTab = () => {
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-1 pt-0">
-          {cases.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">No cases yet.</p>}
-          {cases.map((c) => (
+          <Input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search discussions…" className="mb-2 h-8 text-xs" />
+          {filteredCases.length === 0 && (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              {search ? 'No matches.' : 'No cases yet.'}
+            </p>
+          )}
+          {filteredCases.map((c) => (
             <button key={c.id} onClick={() => setActive(c)}
               className={`w-full text-left p-2 rounded border ${active?.id === c.id ? 'border-primary bg-accent' : 'border-border hover:bg-accent/50'}`}>
               <p className="text-sm font-medium truncate">{c.title}</p>
@@ -181,19 +221,38 @@ const CasesTab = () => {
               {msgs.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No replies yet.</p>}
               {msgs.map((m) => {
                 const mine = m.user_id === user?.id;
+                const parent = m.parent_message_id ? msgs.find((x) => x.id === m.parent_message_id) : null;
                 return (
                   <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${mine ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       {!mine && <p className="text-[10px] font-medium opacity-70 mb-0.5">{label(m.user_id)}</p>}
+                      {parent && (
+                        <div className={`text-[10px] mb-1 pl-2 border-l-2 ${mine ? 'border-primary-foreground/40 opacity-80' : 'border-primary/40'}`}>
+                          <span className="font-medium">{label(parent.user_id)}: </span>
+                          <span className="opacity-80">{parent.body.slice(0, 80)}{parent.body.length > 80 ? '…' : ''}</span>
+                        </div>
+                      )}
                       <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
-                      <p className={`text-[10px] mt-1 ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className={`text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <button type="button" onClick={() => setReplyTo(m)}
+                          className={`text-[10px] underline-offset-2 hover:underline ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                          Reply
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </CardContent>
+            {replyTo && (
+              <div className="border-t border-border px-3 py-1.5 bg-muted/30 flex items-center justify-between text-xs">
+                <span className="truncate">Replying to <strong>{label(replyTo.user_id)}</strong>: {replyTo.body.slice(0, 60)}</span>
+                <button type="button" onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground ml-2">✕</button>
+              </div>
+            )}
             <form onSubmit={sendReply} className="border-t border-border p-3 flex gap-2">
               <Input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Reply… use @ to mention" />
               <Button type="submit" disabled={!reply.trim()}><Send className="w-4 h-4" /></Button>
