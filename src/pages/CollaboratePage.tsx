@@ -221,19 +221,38 @@ const CasesTab = () => {
               {msgs.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">No replies yet.</p>}
               {msgs.map((m) => {
                 const mine = m.user_id === user?.id;
+                const parent = m.parent_message_id ? msgs.find((x) => x.id === m.parent_message_id) : null;
                 return (
                   <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${mine ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       {!mine && <p className="text-[10px] font-medium opacity-70 mb-0.5">{label(m.user_id)}</p>}
+                      {parent && (
+                        <div className={`text-[10px] mb-1 pl-2 border-l-2 ${mine ? 'border-primary-foreground/40 opacity-80' : 'border-primary/40'}`}>
+                          <span className="font-medium">{label(parent.user_id)}: </span>
+                          <span className="opacity-80">{parent.body.slice(0, 80)}{parent.body.length > 80 ? '…' : ''}</span>
+                        </div>
+                      )}
                       <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
-                      <p className={`text-[10px] mt-1 ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className={`text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        <button type="button" onClick={() => setReplyTo(m)}
+                          className={`text-[10px] underline-offset-2 hover:underline ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                          Reply
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </CardContent>
+            {replyTo && (
+              <div className="border-t border-border px-3 py-1.5 bg-muted/30 flex items-center justify-between text-xs">
+                <span className="truncate">Replying to <strong>{label(replyTo.user_id)}</strong>: {replyTo.body.slice(0, 60)}</span>
+                <button type="button" onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground ml-2">✕</button>
+              </div>
+            )}
             <form onSubmit={sendReply} className="border-t border-border p-3 flex gap-2">
               <Input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Reply… use @ to mention" />
               <Button type="submit" disabled={!reply.trim()}><Send className="w-4 h-4" /></Button>
