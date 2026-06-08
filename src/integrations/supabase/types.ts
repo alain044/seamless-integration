@@ -352,6 +352,7 @@ export type Database = {
           created_at: string
           id: string
           mentions: string[] | null
+          parent_message_id: string | null
           user_id: string
         }
         Insert: {
@@ -360,6 +361,7 @@ export type Database = {
           created_at?: string
           id?: string
           mentions?: string[] | null
+          parent_message_id?: string | null
           user_id: string
         }
         Update: {
@@ -368,6 +370,7 @@ export type Database = {
           created_at?: string
           id?: string
           mentions?: string[] | null
+          parent_message_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -376,6 +379,13 @@ export type Database = {
             columns: ["case_id"]
             isOneToOne: false
             referencedRelation: "collab_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collab_case_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "collab_case_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -1263,6 +1273,7 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      mfa_grace_remaining: { Args: { _user_id: string }; Returns: number }
       sync_budget_spent: {
         Args: { _category: string; _user_id: string }
         Returns: undefined
