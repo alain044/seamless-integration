@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Headphones, Play, Pause, RotateCcw, SkipBack, SkipForward, CheckCircle2 } from 'lucide-react';
+import { Headphones, Play, Pause, RotateCcw, SkipBack, SkipForward, CheckCircle2, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Briefing {
@@ -34,7 +34,18 @@ const Player = ({ b, onEvent }: {
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(b.progressSeconds || 0);
   const [dur, setDur] = useState(0);
+  const [volume, setVolume] = useState(() => {
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('briefing_volume') : null;
+    return stored ? Math.max(0, Math.min(1, Number(stored))) : 1;
+  });
+  const [muted, setMuted] = useState(false);
   const playedOnce = useRef(b.listened);
+
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    el.volume = muted ? 0 : volume;
+    try { window.localStorage.setItem('briefing_volume', String(volume)); } catch {}
+  }, [volume, muted]);
 
   useEffect(() => {
     const el = ref.current;
@@ -104,6 +115,14 @@ const Player = ({ b, onEvent }: {
         {b.completedAt && <span className="ml-auto text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Completed</span>}
       </div>
       <Slider value={[pos]} max={dur || 1} step={1} onValueChange={(v) => seek(v[0])} />
+      <div className="flex items-center gap-2">
+        <Button size="icon" variant="ghost" onClick={() => setMuted((m) => !m)} title={muted ? 'Unmute' : 'Mute'}>
+          {muted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </Button>
+        <Slider className="max-w-[160px]" value={[Math.round((muted ? 0 : volume) * 100)]} max={100} step={1}
+          onValueChange={(v) => { setVolume(v[0] / 100); if (muted && v[0] > 0) setMuted(false); }} />
+        <span className="text-xs text-muted-foreground tabular-nums">{Math.round((muted ? 0 : volume) * 100)}%</span>
+      </div>
     </div>
   );
 };
