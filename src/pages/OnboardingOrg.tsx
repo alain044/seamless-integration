@@ -226,8 +226,8 @@ const OnboardingOrg = () => {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
               <Building2 className="w-6 h-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Set up your organization</CardTitle>
-            <CardDescription>Create a new one, or join an existing organization with a code.</CardDescription>
+            <CardTitle className="text-2xl">Join your organization</CardTitle>
+            <CardDescription>Enter the invite code from your organization's admin to request access.</CardDescription>
           </CardHeader>
           <CardContent>
             {hasActivePending && (
@@ -238,69 +238,31 @@ const OnboardingOrg = () => {
               </Alert>
             )}
 
-            <Tabs defaultValue="join">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="join">Join</TabsTrigger>
-                <TabsTrigger value="create">Create</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="join" className="pt-4">
-                <form onSubmit={handleSubmitRequest} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Organization join code</Label>
-                    <Input
-                      id="code"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
-                      placeholder="e.g. A4K9PXR2"
-                      maxLength={12}
-                      className="font-mono tracking-widest text-center"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="message">Message (optional)</Label>
-                    <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={300} />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={submitting || !code.trim()}>
-                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Users className="mr-2 h-4 w-4" /> Request access
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="create" className="pt-4">
-                <form onSubmit={handleCreateOrg} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="orgName">Organization name *</Label>
-                    <Input id="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Acme Microfinance" required minLength={2} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="orgType">Type *</Label>
-                    <Select value={orgType} onValueChange={setOrgType}>
-                      <SelectTrigger id="orgType"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ORG_TYPES.map((tp) => (
-                          <SelectItem key={tp} value={tp}>{t(`org.types.${tp}`)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="orgDesc">Description</Label>
-                    <Textarea id="orgDesc" value={orgDesc} onChange={(e) => setOrgDesc(e.target.value)} rows={2} maxLength={300} />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={creating || orgName.trim().length < 2 || !orgType}
-                  >
-                    {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Building2 className="mr-2 h-4 w-4" /> Create organization
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleSubmitRequest} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Organization join code</Label>
+                <Input
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                  placeholder="e.g. A4K9PXR2"
+                  maxLength={12}
+                  className="font-mono tracking-widest text-center"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ask your organization's admin or owner for the 8-character invite code.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message">Message (optional)</Label>
+                <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} rows={2} maxLength={300} />
+              </div>
+              <Button type="submit" className="w-full" disabled={submitting || !code.trim()}>
+                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Users className="mr-2 h-4 w-4" /> Request access
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
