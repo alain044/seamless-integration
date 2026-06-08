@@ -22,7 +22,7 @@ const STATUS_VARIANT: Record<Status, 'default' | 'secondary' | 'destructive' | '
 };
 
 interface Case { id: string; title: string; description: string | null; status: Status; priority: string; created_by: string; created_at: string; }
-interface Msg { id: string; case_id: string; user_id: string; body: string; created_at: string; }
+interface Msg { id: string; case_id: string; user_id: string; body: string; created_at: string; parent_message_id?: string | null; mentions?: string[] }
 interface ChatMsg { id: string; user_id: string; body: string; created_at: string; }
 
 const CasesTab = () => {
@@ -35,6 +35,23 @@ const CasesTab = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reply, setReply] = useState('');
   const [profiles, setProfiles] = useState<Record<string, { full_name: string | null; email: string | null }>>({});
+  const [search, setSearch] = useState('');
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const [members, setMembers] = useState<Array<{ user_id: string; full_name: string | null; email: string | null }>>([]);
+
+  useEffect(() => {
+    if (!organization) return;
+    (async () => {
+      const { data: mems } = await supabase.from('organization_members')
+        .select('user_id').eq('organization_id', organization.id);
+      const ids = (mems || []).map((m: any) => m.user_id);
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles')
+          .select('user_id, full_name, email').in('user_id', ids);
+        setMembers((profs || []) as any);
+      }
+    })();
+  }, [organization?.id]);
 
   const loadProfiles = async (ids: string[]) => {
     const missing = ids.filter((id) => !profiles[id]);
@@ -105,10 +122,27 @@ const CasesTab = () => {
     e.preventDefault();
     if (!user || !active || !reply.trim()) return;
     const body = reply.trim();
-    setReply('');
-    const { error } = await supabase.from('collab_case_messages').insert({ case_id: active.id, user_id: user.id, body });
+    // Extract @mentions: match @name to a member's full_name or email
+    const mentionMatches = Array.from(body.matchAll(/@([\w.@-]+)/g)).map((m) => m[1].toLowerCase());
+    const mentionIds = members
+      .filter((m) => {
+        const hay = `${m.full_name ?? ''} ${m.email ?? ''}`.toLowerCase();
+        return mentionMatches.some((q) => hay.includes(q));
+      })
+      .map((m) => m.user_id);
+    setReply(''); const parent = replyTo?.id ?? null; setReplyTo(null);
+    const { error } = await supabase.from('collab_case_messages').insert({
+      case_id: active.id, user_id: user.id, body,
+      mentions: mentionIds, parent_message_id: parent,
+    } as any);
     if (error) toast.error(error.message);
   };
+
+  const filteredCases = cases.filter((c) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return c.title.toLowerCase().includes(q) || (c.description ?? '').toLowerCase().includes(q);
+  });
 
   const label = (uid: string) => profiles[uid]?.full_name || profiles[uid]?.email || uid.slice(0, 8);
 
