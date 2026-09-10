@@ -19,9 +19,10 @@ dist-ssr
 
 # Scratch / tooling artifacts
 .docx_tmp/
-.nova/events/
-.nova/sessions/
-.nova/checkpoint-index
+
+# Agent harness state (memory, sessions, SQLite index). Local only — the index
+# is a binary that rewrites on every session, so tracking it is pure churn.
+.nova/
 
 # Editor directories and files
 .vscode/*
