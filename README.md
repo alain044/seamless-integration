@@ -220,6 +220,7 @@ The suite runs in jsdom and takes a few seconds. What each file guards against:
 | `src/test/securityLogLazy.test.ts` | A static `import` of `src/lib/securityLog.ts`, which pins it into the main bundle and makes the lazy chunk unsplittable. |
 | `src/test/edgeFunctions.test.ts` | The System Status registry drifting from `supabase/functions/`. |
 | `src/test/healthCheckPanel.test.tsx` | The status panel rendering anything other than the registry. |
+| `src/test/readme-test-table.test.ts` | This table itself drifting from `src/test/` — a suite landing unlisted, or a removed one lingering. |
 
 **Windows:** run vitest through Node. `node_modules\.bin\vitest.cmd` fails with
 `spawn EINVAL` on this setup:
