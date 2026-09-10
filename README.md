@@ -215,6 +215,9 @@ The suite runs in jsdom and takes a few seconds. What each file guards against:
 | `src/test/app-smoke.test.tsx` | The assembled app: that the route table actually renders and that the auth gate redirects a signed-out visitor off `/dashboard`. |
 | `src/test/schema-consistency.test.ts` | A `select()` naming a column absent from the generated Supabase types — PostgREST would fail this silently at runtime. |
 | `src/test/i18n-consistency.test.ts` | A locale missing keys, shipping a blank string, or dropping a `{{placeholder}}`; i18next falls back to English silently, so nothing else would notice. |
+| `src/test/i18n-untranslated.test.ts` | A locale that defines every key but keeps the English sentence as its value — key parity alone proves a key *exists*, not that it was translated. |
+| `src/test/codeSplitting.test.ts` | A page imported statically instead of through `lazy()` — Rollup folds it, and its heavy libraries, back into the entry bundle while the build still succeeds. |
+| `src/test/securityLogLazy.test.ts` | A static `import` of `src/lib/securityLog.ts`, which pins it into the main bundle and makes the lazy chunk unsplittable. |
 | `src/test/edgeFunctions.test.ts` | The System Status registry drifting from `supabase/functions/`. |
 | `src/test/healthCheckPanel.test.tsx` | The status panel rendering anything other than the registry. |
 

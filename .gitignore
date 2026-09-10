@@ -21,6 +21,7 @@ dist-ssr
 .docx_tmp/
 .nova/events/
 .nova/sessions/
+.nova/checkpoint-index
 
 # Editor directories and files
 .vscode/*
