@@ -221,6 +221,7 @@ The suite runs in jsdom and takes a few seconds. What each file guards against:
 | `src/test/edgeFunctions.test.ts` | The System Status registry drifting from `supabase/functions/`. |
 | `src/test/healthCheckPanel.test.tsx` | The status panel rendering anything other than the registry. |
 | `src/test/readme-test-table.test.ts` | This table itself drifting from `src/test/` — a suite landing unlisted, or a removed one lingering. |
+| `src/test/no-inline-credentials.test.ts` | A JWT literal frozen into `supabase/migrations/` — once applied it cannot be rotated without another migration. |
 
 **Windows:** run vitest through Node. `node_modules\.bin\vitest.cmd` fails with
 `spawn EINVAL` on this setup:
