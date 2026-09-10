@@ -1,0 +1,29 @@
+project_id = "svixhxkbroelwmpxynjy"
+
+[functions.admin-stepup]
+verify_jwt = true
+
+[functions.admin-check]
+verify_jwt = true
+
+[functions.send-contact-message]
+verify_jwt = false
+
+[functions.ai-usage-check]
+verify_jwt = false
+
+[functions.smartscan-extract]
+verify_jwt = true
+
+[functions.ai-budget-suggest]
+verify_jwt = true
+
+[functions.integrity-check]
+verify_jwt = true
+
+[functions.integrity-check-cron]
+verify_jwt = false
+
+[functions.ai-goal-coach]
+verify_jwt = true
+

@@ -1,0 +1,158 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
+import { Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface SavingsGoal { id: string; name: string; target: number; saved: number; icon: string; }
+interface GoalRec { id: string; goal_id: string; strategy: string; weekly_savings: number | null; milestones: any; tips: any; created_at: string; }
+
+const Savings = () => {
+  const { t } = useTranslation();
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newGoal, setNewGoal] = useState({ name: '', target: '' });
+  const [recs, setRecs] = useState<Record<string, GoalRec>>({});
+  const [coaching, setCoaching] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from('savings_goals').select('*').order('created_at', { ascending: true });
+      if (error) toast.error(error.message);
+      else setGoals((data || []) as SavingsGoal[]);
+      const { data: r } = await supabase
+        .from('ai_goal_recommendations')
+        .select('*')
+        .order('created_at', { ascending: false });
+      const latest: Record<string, GoalRec> = {};
+      (r || []).forEach((row: any) => { if (row.goal_id && !latest[row.goal_id]) latest[row.goal_id] = row; });
+      setRecs(latest);
+      setLoading(false);
+    })();
+  }, []);
+
+  const askCoach = async (goalId: string) => {
+    setCoaching(goalId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-goal-coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ goal_id: goalId }),
+      });
+      const json = await r.json();
+      if (!r.ok) { toast.error(json.error || 'Failed'); return; }
+      setRecs(prev => ({ ...prev, [goalId]: json.recommendation }));
+      toast.success('AI plan generated');
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setCoaching(null);
+    }
+  };
+
+  const totalSaved = goals.reduce((s, g) => s + Number(g.saved), 0);
+  const totalTarget = goals.reduce((s, g) => s + Number(g.target), 0);
+
+  const handleAdd = async () => {
+    if (!newGoal.name || !newGoal.target) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error('Sign in required'); return; }
+    const { data, error } = await supabase.from('savings_goals').insert({
+      user_id: user.id,
+      name: newGoal.name,
+      target: parseFloat(newGoal.target),
+      saved: 0,
+      icon: '🎯',
+    }).select().single();
+    if (error) { toast.error(error.message); return; }
+    setGoals((prev) => [...prev, data as SavingsGoal]);
+    setNewGoal({ name: '', target: '' });
+    setDialogOpen(false);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">{t('savings.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('savings.subtitle')}</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="w-4 h-4 mr-2" />{t('savings.newGoal')}</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{t('savings.createGoal')}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <Input placeholder={t('savings.goalName')} value={newGoal.name} onChange={(e) => setNewGoal((p) => ({ ...p, name: e.target.value }))} />
+              <Input type="number" placeholder={t('savings.targetAmount')} value={newGoal.target} onChange={(e) => setNewGoal((p) => ({ ...p, target: e.target.value }))} />
+              <Button onClick={handleAdd} className="w-full">{t('savings.create')}</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-6">
+        <p className="text-sm text-muted-foreground">{t('savings.totalSaved')}</p>
+        <p className="text-2xl font-bold text-card-foreground">${totalSaved.toLocaleString()} / ${totalTarget.toLocaleString()}</p>
+      </div>
+
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {goals.map((goal, i) => {
+          const pct = Math.min((Number(goal.saved) / Number(goal.target)) * 100, 100);
+          return (
+            <motion.div
+              key={goal.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              className="rounded-xl border border-border bg-card p-5"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">{goal.icon}</span>
+                <div>
+                  <h3 className="font-semibold text-card-foreground">{goal.name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    ${Number(goal.saved).toLocaleString()} {t('savings.of')} ${Number(goal.target).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">{pct.toFixed(0)}% {t('savings.saved')}</p>
+              <div className="mt-3 flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={() => askCoach(goal.id)} disabled={coaching === goal.id}>
+                  {coaching === goal.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  AI Goal Coach
+                </Button>
+                {recs[goal.id]?.weekly_savings != null && (
+                  <span className="text-xs text-muted-foreground">Save ${Number(recs[goal.id].weekly_savings).toFixed(0)}/wk</span>
+                )}
+              </div>
+              {recs[goal.id] && (
+                <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-2">
+                  <p className="text-foreground">{recs[goal.id].strategy}</p>
+                  {Array.isArray(recs[goal.id].tips) && recs[goal.id].tips.length > 0 && (
+                    <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                      {recs[goal.id].tips.slice(0, 3).map((tip: string, ti: number) => <li key={ti}>{tip}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default Savings;

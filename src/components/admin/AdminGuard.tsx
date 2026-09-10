@@ -1,0 +1,69 @@
+import { useEffect, useState, ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { Loader2, ShieldAlert } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { UNAUTHORIZED_ADMIN_COPY } from './UnauthorizedAdmin';
+
+export const AdminGuard = ({ children }: { children: ReactNode }) => {
+  const { organization, isOwner, loading: orgLoading } = useOrganization();
+  const { user } = useAuth();
+  const location = useLocation();
+  const [state, setState] = useState<'checking' | 'verified' | 'unverified' | 'denied'>('checking');
+
+  useEffect(() => {
+    if (orgLoading || !organization) return;
+    if (!isOwner) {
+      setState('denied');
+      // Imported dynamically, matching AuthPage. A static import here would
+      // pin this module into the main bundle and defeat the caller's lazy
+      // import (Vite warns: "also statically imported by").
+      void import('@/lib/securityLog').then(({ logSecurityEvent }) =>
+        logSecurityEvent('unauthorized_admin', {
+          user_id: user?.id ?? null,
+          route: location.pathname,
+          metadata: { organization_id: organization.id, reason: 'non_owner' },
+        }),
+      );
+      return;
+    }
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `https://svixhxkbroelwmpxynjy.supabase.co/functions/v1/admin-check?organization_id=${organization.id}`,
+        { headers: { Authorization: `Bearer ${session?.access_token}` } },
+      );
+      const json = await res.json();
+      setState(json.verified ? 'verified' : 'unverified');
+    })();
+  }, [organization, isOwner, orgLoading, location.pathname, user?.id]);
+
+  if (orgLoading || state === 'checking') {
+    return <div className="flex items-center justify-center h-96"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  }
+
+  if (state === 'denied') {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
+              <ShieldAlert className="w-6 h-6 text-destructive" />
+            </div>
+            <CardTitle>Unauthorized Access</CardTitle>
+            <CardDescription>{UNAUTHORIZED_ADMIN_COPY}</CardDescription>
+          </CardHeader>
+          <CardContent />
+        </Card>
+      </div>
+    );
+  }
+
+  if (state === 'unverified') {
+    return <Navigate to="/dashboard/admin/verify" replace state={{ from: location.pathname }} />;
+  }
+
+  return <>{children}</>;
+};
